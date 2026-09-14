@@ -53,5 +53,7 @@ export function requireRole(decoded, roles = []) {
 }
 
 export function requireAdmin(decoded) {
-  requireRole(decoded, ['admin']);
+  if (decoded.role !== 'admin') {
+    throw new Error('Acceso denegado: se requiere rol de administrador');
+  }
 }
