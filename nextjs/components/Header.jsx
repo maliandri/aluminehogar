@@ -1,17 +1,26 @@
 'use client';
 import { useState } from 'react';
-import { ShoppingCart, User, Menu, X, UserCog, MessageSquare } from 'lucide-react';
+import { ShoppingCart, User, Menu, X, UserCog, MessageSquare, ShieldCheck } from 'lucide-react';
 import { useCartStore } from '@/store/cartStore';
 import { useAuthStore } from '@/store/authStore';
 import { useUI } from '@/components/ClientProviders';
 
 export const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const getTotalItems = useCartStore((state) => state.getTotalItems);
-  const { isAuthenticated, user, logout, isVendedor } = useAuthStore();
+  const { isAuthenticated, user, logout, isVendedor, isAdmin } = useAuthStore();
   const { setShowVendedorModal, setShowAuthModal, setShowCartModal } = useUI();
 
   const cartCount = getTotalItems();
+
+  const handleAccountClick = () => {
+    if (isAuthenticated) {
+      setIsAccountMenuOpen((open) => !open);
+    } else {
+      setShowAuthModal(true);
+    }
+  };
 
   return (
     <header className="bg-primary shadow-lg sticky top-0 z-50">
@@ -60,29 +69,55 @@ export const Header = () => {
 
           {/* Icons */}
           <div className="flex items-center space-x-4">
-            {/* Acceso Vendedores — solo visible para vendedores y admins */}
-            {isVendedor() && (
-              <button
-                className="hidden md:flex items-center space-x-2 text-white hover:text-purple-200 transition-colors"
-                onClick={() => setShowVendedorModal(true)}
-                title="Acceso Vendedores"
-              >
-                <UserCog className="w-6 h-6" />
-                <span className="text-sm font-medium">Vendedores</span>
-              </button>
-            )}
-
             {/* User Account */}
-            <button
-              className="flex items-center space-x-2 text-white hover:text-purple-200 transition-colors"
-              onClick={() => setShowAuthModal(true)}
-              title={isAuthenticated ? 'Mi cuenta' : 'Iniciar sesion'}
-            >
-              <User className="w-6 h-6" />
-              {isAuthenticated && (
-                <span className="hidden md:inline text-sm">{user?.email}</span>
+            <div className="relative">
+              <button
+                className="flex items-center space-x-2 text-white hover:text-purple-200 transition-colors"
+                onClick={handleAccountClick}
+                title={isAuthenticated ? 'Mi cuenta' : 'Iniciar sesion'}
+              >
+                <User className="w-6 h-6" />
+                {isAuthenticated && (
+                  <span className="hidden md:inline text-sm">{user?.email}</span>
+                )}
+              </button>
+
+              {isAuthenticated && isAccountMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl py-2 text-gray-700 z-50">
+                  {isAdmin() && (
+                    <a
+                      href="/admin"
+                      className="flex items-center space-x-2 px-4 py-2 hover:bg-gray-100 transition-colors"
+                      onClick={() => setIsAccountMenuOpen(false)}
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Panel Admin</span>
+                    </a>
+                  )}
+                  {isVendedor() && (
+                    <button
+                      className="w-full flex items-center space-x-2 px-4 py-2 hover:bg-gray-100 transition-colors text-left"
+                      onClick={() => {
+                        setIsAccountMenuOpen(false);
+                        setShowVendedorModal(true);
+                      }}
+                    >
+                      <UserCog className="w-4 h-4" />
+                      <span>Panel Vendedor</span>
+                    </button>
+                  )}
+                  <button
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors text-red-600"
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      logout();
+                    }}
+                  >
+                    Cerrar sesion
+                  </button>
+                </div>
               )}
-            </button>
+            </div>
 
             {/* Cart */}
             <button
@@ -140,7 +175,16 @@ export const Header = () => {
               <MessageSquare className="w-4 h-4" />
               Alumine Bot
             </a>
-            {isVendedor() && (
+            {isAuthenticated && isAdmin() && (
+              <a
+                href="/admin"
+                className="block text-white hover:text-purple-200 transition-colors font-medium"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Panel Admin
+              </a>
+            )}
+            {isAuthenticated && isVendedor() && (
               <button
                 onClick={() => {
                   setShowVendedorModal(true);
@@ -148,7 +192,7 @@ export const Header = () => {
                 }}
                 className="block w-full text-left text-white hover:text-purple-200 transition-colors font-medium"
               >
-                Acceso Vendedores
+                Panel Vendedor
               </button>
             )}
             {isAuthenticated && (
