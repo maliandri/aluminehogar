@@ -225,6 +225,28 @@ export const importarStockExcel = async (excelBase64) => {
   return response.data;
 };
 
+// =================== INVITACIONES ===================
+
+export const crearInvitacion = async (email, role) => {
+  const response = await api.post('/invitations', { action: 'create', email, role });
+  return response.data;
+};
+
+export const listarInvitaciones = async () => {
+  const response = await api.get('/invitations');
+  return response.data;
+};
+
+export const revocarInvitacion = async (id) => {
+  const response = await api.delete(`/invitations?id=${id}`);
+  return response.data;
+};
+
+export const aceptarInvitacion = async (token, { password, nombre, telefono }) => {
+  const response = await api.post('/invitations', { action: 'accept', token, password, nombre, telefono });
+  return response.data;
+};
+
 // =================== MERCADO PAGO ===================
 
 export const crearPreferenciaPago = async (items, payer, shippingAddress) => {

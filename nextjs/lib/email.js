@@ -96,6 +96,33 @@ export async function sendPromotionEmail(email, nombre, role) {
   });
 }
 
+export function emailInvitacion(role, linkInvitacion) {
+  const rolesLabels = { customer: 'Cliente', vendedor: 'Vendedor', admin: 'Administrador' };
+  const label = rolesLabels[role] || role;
+
+  return `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
+      <div style="background: linear-gradient(135deg, #2d5016 0%, #4a7c25 100%); padding: 30px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 28px;">Alumine Hogar</h1>
+        <p style="color: #d4e8c2; margin: 8px 0 0; font-size: 14px;">Invitacion a la plataforma</p>
+      </div>
+      <div style="padding: 30px;">
+        <h2 style="color: #2d5016; margin-top: 0;">Te invitaron a Alumine Hogar</h2>
+        <p style="color: #333; line-height: 1.6;">Fuiste invitado/a a unirte como <strong>${label}</strong>.</p>
+        <p style="color: #333; line-height: 1.6;">Hace click en el siguiente boton para crear tu contrasena y activar tu cuenta:</p>
+        <div style="text-align: center; margin: 25px 0;">
+          <a href="${linkInvitacion}" style="background: #4a7c25; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Activar mi cuenta</a>
+        </div>
+        <p style="color: #888; font-size: 13px; text-align: center;">Este enlace vence en 7 dias.</p>
+      </div>
+      <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #888;">
+        <p style="margin: 0;">Alumine Hogar - Neuquen, Argentina</p>
+        <p style="margin: 5px 0 0;">+54 9 299 576-9999 | aluminehogar@gmail.com</p>
+      </div>
+    </div>
+  `;
+}
+
 export async function enviarEmail({ destinatario, asunto, cuerpoHtml }) {
   console.log('=== ENVIO EMAIL via Resend ===');
   console.log('Destinatario:', destinatario);

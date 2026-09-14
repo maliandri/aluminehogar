@@ -46,8 +46,12 @@ export function extractTokenFromHeaders(headers) {
   return null;
 }
 
-export function requireAdmin(decoded) {
-  if (decoded.role !== 'admin') {
-    throw new Error('Acceso denegado: se requiere rol de administrador');
+export function requireRole(decoded, roles = []) {
+  if (!roles.includes(decoded.role)) {
+    throw new Error(`Acceso denegado: se requiere rol ${roles.join(' o ')}`);
   }
+}
+
+export function requireAdmin(decoded) {
+  requireRole(decoded, ['admin']);
 }

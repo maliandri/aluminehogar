@@ -19,6 +19,9 @@ import {
   eliminarUsuario,
   actualizarStock,
   importarStockExcel,
+  crearInvitacion,
+  listarInvitaciones,
+  revocarInvitacion,
 } from '@/services/api';
 
 export default function AdminPanel() {
@@ -437,6 +440,103 @@ export default function AdminPanel() {
 
 // =================== USERS PANEL ===================
 
+const ROLE_LABELS_INVITACION = { customer: 'Cliente', vendedor: 'Vendedor', admin: 'Admin' };
+
+function InvitationsBlock() {
+  const [invitations, setInvitations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('vendedor');
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => { fetchInvitations(); }, []);
+
+  const fetchInvitations = async () => {
+    try {
+      setLoading(true);
+      const data = await listarInvitaciones();
+      setInvitations(data.invitations || []);
+    } catch {
+      // silencioso: no bloquea el resto del panel
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInvitar = async (e) => {
+    e.preventDefault();
+    if (!email) return;
+    setSending(true);
+    try {
+      await crearInvitacion(email, role);
+      setEmail('');
+      fetchInvitations();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al enviar la invitacion');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleRevocar = async (id) => {
+    if (!confirm('¿Revocar esta invitación?')) return;
+    try {
+      await revocarInvitacion(id);
+      fetchInvitations();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al revocar la invitación');
+    }
+  };
+
+  const pendientes = invitations.filter(inv => !inv.usedAt && new Date(inv.expiresAt) >= new Date());
+
+  return (
+    <div className="bg-white shadow rounded-lg p-4 mb-4">
+      <h3 className="text-sm font-semibold text-gray-700 mb-3">Invitar usuario nuevo</h3>
+      <form onSubmit={handleInvitar} className="flex flex-col sm:flex-row gap-2 mb-4">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="email@ejemplo.com"
+          className="flex-1 border rounded px-3 py-2 text-sm"
+          required
+        />
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          className="border rounded px-3 py-2 text-sm"
+        >
+          <option value="customer">Cliente</option>
+          <option value="vendedor">Vendedor</option>
+          <option value="admin">Admin</option>
+        </select>
+        <button
+          type="submit"
+          disabled={sending}
+          className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
+        >
+          {sending ? 'Enviando...' : 'Invitar'}
+        </button>
+      </form>
+
+      {!loading && pendientes.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-gray-500 mb-1">Invitaciones pendientes</p>
+          {pendientes.map((inv) => (
+            <div key={inv._id} className="flex items-center justify-between text-sm py-1 border-t">
+              <span>{inv.email} — <span className="text-xs text-gray-500">{ROLE_LABELS_INVITACION[inv.role] || inv.role}</span></span>
+              <button onClick={() => handleRevocar(inv._id)} className="text-red-600 hover:text-red-800 text-xs">
+                Revocar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function UsersPanel({ currentUserId }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -521,6 +621,8 @@ function UsersPanel({ currentUserId }) {
 
   return (
     <>
+      <InvitationsBlock />
+
       <div className="bg-white shadow rounded-lg p-4 mb-4">
         <div className="flex gap-3">
           <div className="relative flex-1">
