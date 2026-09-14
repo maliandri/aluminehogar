@@ -4,8 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm install --prefix api && cd Frontend && npm install --legacy-peer-deps --force && npm run build",
-    "vercel-build": "npm install --prefix api && cd Frontend && npm install --legacy-peer-deps --force && npm run build",
     "create-admin": "node scripts/create-admin.js",
     "generar-sitemap": "node scripts/seo/generar-sitemap.js",
     "renombrar-imagenes": "node scripts/renombrar-imagenes-cloudinary.js",
@@ -14,10 +12,6 @@
     "buscar-imagenes": "node scripts/buscar-imagenes.js",
     "reporte-sin-foto": "node scripts/reporte-productos-sin-foto.js"
   },
-  "workspaces": [
-    "Frontend",
-    "api"
-  ],
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "bcryptjs": "^3.0.3",
