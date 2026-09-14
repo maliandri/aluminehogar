@@ -247,6 +247,45 @@ export const aceptarInvitacion = async (token, { password, nombre, telefono }) =
   return response.data;
 };
 
+// =================== CREDITOS (vendedor) ===================
+
+export const crearCredito = async (creditoData) => {
+  const response = await api.post('/creditos', { action: 'create', ...creditoData });
+  return response.data;
+};
+
+export const listarCreditos = async () => {
+  const response = await api.get('/creditos?action=list');
+  return response.data;
+};
+
+export const marcarCuotaCredito = async (id, numero) => {
+  const response = await api.post('/creditos', { action: 'marcar-cuota', id, numero });
+  return response.data;
+};
+
+export const aprobarCredito = async (id) => {
+  const response = await api.post('/creditos', { action: 'aprobar', id });
+  return response.data;
+};
+
+export const rechazarCredito = async (id) => {
+  const response = await api.post('/creditos', { action: 'rechazar', id });
+  return response.data;
+};
+
+// =================== CONFIGURACION DE PAGOS ===================
+
+export const getPaymentSettings = async () => {
+  const response = await api.get('/payment-settings');
+  return response.data;
+};
+
+export const actualizarPaymentSettings = async (settingsData) => {
+  const response = await api.put('/payment-settings', settingsData);
+  return response.data;
+};
+
 // =================== MERCADO PAGO ===================
 
 export const crearPreferenciaPago = async (items, payer, shippingAddress) => {

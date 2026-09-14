@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { connectDB } from '@/lib/db';
 import Order from '@/lib/models/Order';
+import PaymentSettings from '@/lib/models/PaymentSettings';
 import { extractTokenFromHeaders, verifyToken } from '@/lib/auth-helpers';
 import { enviarEmail } from '@/lib/email';
 
@@ -31,6 +32,10 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Informacion del comprador requerida' }, { status: 400 });
       }
 
+      await connectDB();
+      const settings = await PaymentSettings.findById('default');
+      const maxCuotas = settings?.maxCuotasMercadoPago || 12;
+
       const preferenceData = {
         items: items.map(item => ({
           title: item.nombre,
@@ -53,6 +58,9 @@ export async function POST(request) {
         auto_return: 'approved',
         notification_url: `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : process.env.FRONTEND_URL}/api/mercadopago?action=webhook`,
         statement_descriptor: 'ALUMINE HOGAR',
+        payment_methods: {
+          installments: maxCuotas
+        },
         external_reference: `order_${Date.now()}_${decoded.userId}`,
         metadata: {
           userId: decoded.userId,

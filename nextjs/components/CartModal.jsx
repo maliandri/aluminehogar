@@ -1,12 +1,14 @@
 'use client';
-import { X, Plus, Minus, Trash2, ShoppingBag, Copy, Check } from 'lucide-react';
+import { X, Plus, Minus, Trash2, ShoppingBag, Copy, Check, CreditCard } from 'lucide-react';
 import { useCartStore } from '@/store/cartStore';
 import { trackInitiateCheckout, trackContact } from '@/utils/facebookPixel';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 const MP_ALIAS = process.env.NEXT_PUBLIC_MP_ALIAS || 'alumine.hogar.mp';
 
 export const CartModal = ({ isOpen, onClose }) => {
+  const router = useRouter();
   const cart = useCartStore((state) => state.cart);
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const removeFromCart = useCartStore((state) => state.removeFromCart);
@@ -180,6 +182,17 @@ export const CartModal = ({ isOpen, onClose }) => {
               </div>
 
               <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    onClose();
+                    router.push('/checkout');
+                  }}
+                  className="w-full bg-primary text-white px-4 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity flex items-center justify-center space-x-2"
+                >
+                  <CreditCard className="w-5 h-5" />
+                  <span>Pagar con tarjeta (cuotas)</span>
+                </button>
+
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={handleWhatsAppCheckout}

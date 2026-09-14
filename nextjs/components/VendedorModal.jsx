@@ -1,14 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { X, FileDown, Send, Trash2, Lock, Percent } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, FileDown, Send, Trash2, Percent, CreditCard, List } from 'lucide-react';
 import { CloudinaryImage } from './CloudinaryImage';
 import jsPDF from 'jspdf';
-import { enviarPresupuesto } from '@/services/api';
+import { enviarPresupuesto, crearCredito, listarCreditos, marcarCuotaCredito } from '@/services/api';
 
 export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
+  const [activeTab, setActiveTab] = useState('presupuesto');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [carritoVendedor, setCarritoVendedor] = useState({});
   const [vendedor, setVendedor] = useState({ nombre: '' });
@@ -28,17 +27,6 @@ export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
     'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero',
     'Tierra del Fuego', 'Tucuman'
   ];
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (password === process.env.NEXT_PUBLIC_VENDEDOR_PASSWORD) {
-      setIsAuthenticated(true);
-      setPassword('');
-    } else {
-      alert('Contrasena incorrecta');
-      setPassword('');
-    }
-  };
 
   const productosFiltrados = selectedCategory
     ? productos.filter(p => p.categoria === selectedCategory)
@@ -193,33 +181,6 @@ export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
 
   if (!isOpen) return null;
 
-  if (!isAuthenticated) {
-    return (
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Acceso Vendedores</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Lock className="w-4 h-4 inline mr-2" />
-                Contrasena
-              </label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                className="input-field" placeholder="Ingrese la contrasena" required autoFocus />
-            </div>
-            <button type="submit" className="w-full btn-primary">Ingresar</button>
-          </form>
-          <p className="text-xs text-gray-500 text-center mt-4">Solo personal autorizado</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -230,7 +191,29 @@ export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
           </button>
         </div>
 
+        <div className="flex space-x-1 px-6 pt-3 border-b bg-gray-50">
+          <button
+            onClick={() => setActiveTab('presupuesto')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'presupuesto' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          >
+            Presupuesto
+          </button>
+          <button
+            onClick={() => setActiveTab('credito')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1 ${activeTab === 'credito' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          >
+            <CreditCard className="w-4 h-4" /> Otorgar credito
+          </button>
+          <button
+            onClick={() => setActiveTab('mis-creditos')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1 ${activeTab === 'mis-creditos' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          >
+            <List className="w-4 h-4" /> Mis creditos
+          </button>
+        </div>
+
         <div className="flex-1 overflow-y-auto p-6">
+          {activeTab === 'presupuesto' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
               <h3 className="text-xl font-semibold mb-4">Productos</h3>
@@ -361,8 +344,193 @@ export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
               </div>
             </div>
           </div>
+          )}
+
+          {activeTab === 'credito' && (
+            <OtorgarCreditoTab
+              carritoVendedor={carritoVendedor}
+              cliente={cliente}
+              setCliente={setCliente}
+              calcularTotal={calcularTotal}
+              onCreado={() => setActiveTab('mis-creditos')}
+            />
+          )}
+
+          {activeTab === 'mis-creditos' && <MisCreditosTab isOpen={isOpen} />}
         </div>
       </div>
     </div>
   );
 };
+
+function OtorgarCreditoTab({ carritoVendedor, cliente, setCliente, calcularTotal, onCreado }) {
+  const [anticipoPorcentaje, setAnticipoPorcentaje] = useState(20);
+  const [cantidadCuotas, setCantidadCuotas] = useState(3);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const montoTotal = calcularTotal();
+  const anticipo = Math.round(montoTotal * (anticipoPorcentaje / 100));
+
+  const handleOtorgar = async () => {
+    setError('');
+    const items = Object.values(carritoVendedor);
+
+    if (items.length === 0) {
+      setError('Agrega productos en la pestana Presupuesto antes de otorgar el credito');
+      return;
+    }
+    if (!cliente.nombre) {
+      setError('Ingresa el nombre del cliente');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await crearCredito({
+        clienteNombre: cliente.nombre,
+        clienteTelefono: cliente.telefono,
+        clienteEmail: cliente.email,
+        productos: items.map(i => ({ nombre: i.nombre, precio: i.precio, cantidad: i.cantidad })),
+        montoTotal,
+        anticipo,
+        cantidadCuotas
+      });
+      alert('Credito otorgado correctamente');
+      onCreado();
+    } catch (err) {
+      setError(err.response?.data?.error || 'No se pudo otorgar el credito');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-lg mx-auto space-y-4">
+      <h3 className="text-xl font-semibold">Otorgar credito al cliente</h3>
+      <p className="text-sm text-gray-500">
+        Usa los productos cargados en la pestana "Presupuesto" como base del monto total.
+      </p>
+
+      {error && <div className="bg-red-50 text-red-700 text-sm rounded-lg p-3">{error}</div>}
+
+      <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+        <input type="text" value={cliente.nombre} onChange={(e) => setCliente({ ...cliente, nombre: e.target.value })}
+          className="input-field" placeholder="Nombre del cliente" />
+        <input type="tel" value={cliente.telefono} onChange={(e) => setCliente({ ...cliente, telefono: e.target.value })}
+          className="input-field" placeholder="Telefono" />
+        <input type="email" value={cliente.email} onChange={(e) => setCliente({ ...cliente, email: e.target.value })}
+          className="input-field" placeholder="Email (opcional)" />
+      </div>
+
+      <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+        <div className="flex justify-between text-sm">
+          <span>Monto total (segun presupuesto)</span>
+          <span className="font-bold">${montoTotal.toLocaleString('es-AR')}</span>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Anticipo (%)</label>
+          <input type="number" min="0" max="90" value={anticipoPorcentaje}
+            onChange={(e) => setAnticipoPorcentaje(Number(e.target.value))} className="input-field" />
+          <p className="text-xs text-gray-500 mt-1">Anticipo: ${anticipo.toLocaleString('es-AR')}</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Cantidad de cuotas</label>
+          <input type="number" min="1" max="24" value={cantidadCuotas}
+            onChange={(e) => setCantidadCuotas(Number(e.target.value))} className="input-field" />
+          {cantidadCuotas > 0 && montoTotal > 0 && (
+            <p className="text-xs text-gray-500 mt-1">
+              {cantidadCuotas} cuotas de ${Math.round((montoTotal - anticipo) / cantidadCuotas).toLocaleString('es-AR')}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <button onClick={handleOtorgar} disabled={loading} className="w-full btn-primary disabled:opacity-50">
+        {loading ? 'Otorgando...' : 'Otorgar credito'}
+      </button>
+    </div>
+  );
+}
+
+function MisCreditosTab({ isOpen }) {
+  const [creditos, setCreditos] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (isOpen) fetchCreditos();
+  }, [isOpen]);
+
+  const fetchCreditos = async () => {
+    try {
+      setLoading(true);
+      const data = await listarCreditos();
+      setCreditos(data.creditos || []);
+    } catch {
+      // silencioso
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMarcarPagada = async (id, numero) => {
+    try {
+      await marcarCuotaCredito(id, numero);
+      fetchCreditos();
+    } catch (err) {
+      alert(err.response?.data?.error || 'No se pudo marcar la cuota como pagada');
+    }
+  };
+
+  const estadoBadge = (estado) => {
+    const styles = {
+      activo: 'bg-green-100 text-green-700',
+      pendiente_aprobacion: 'bg-yellow-100 text-yellow-700',
+      rechazado: 'bg-red-100 text-red-700',
+      completado: 'bg-blue-100 text-blue-700'
+    };
+    const labels = { activo: 'Activo', pendiente_aprobacion: 'Pendiente de aprobacion', rechazado: 'Rechazado', completado: 'Completado' };
+    return <span className={`px-2 py-1 rounded text-xs font-medium ${styles[estado] || 'bg-gray-100'}`}>{labels[estado] || estado}</span>;
+  };
+
+  if (loading) return <div className="text-center py-12 text-gray-500">Cargando creditos...</div>;
+
+  if (creditos.length === 0) {
+    return <div className="text-center py-12 text-gray-500">No otorgaste ningun credito todavia.</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {creditos.map((credito) => (
+        <div key={credito._id} className="bg-gray-50 rounded-lg p-4">
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <p className="font-semibold">{credito.clienteNombre}</p>
+              <p className="text-xs text-gray-500">{credito.clienteTelefono}</p>
+            </div>
+            {estadoBadge(credito.estado)}
+          </div>
+          <div className="text-sm text-gray-600 mb-3">
+            Total ${credito.montoTotal.toLocaleString('es-AR')} — Anticipo ${credito.anticipo.toLocaleString('es-AR')} — {credito.cantidadCuotas} cuotas
+          </div>
+          {credito.estado !== 'rechazado' && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {credito.cuotas.map((cuota) => (
+                <button
+                  key={cuota.numero}
+                  onClick={() => cuota.estado === 'pendiente' && handleMarcarPagada(credito._id, cuota.numero)}
+                  disabled={cuota.estado === 'pagada'}
+                  className={`text-xs rounded px-2 py-2 border ${cuota.estado === 'pagada' ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-gray-300 hover:bg-gray-100'}`}
+                >
+                  <div className="font-medium">Cuota {cuota.numero}</div>
+                  <div>${cuota.monto.toLocaleString('es-AR')}</div>
+                  <div>{cuota.estado === 'pagada' ? 'Pagada' : 'Marcar pagada'}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
