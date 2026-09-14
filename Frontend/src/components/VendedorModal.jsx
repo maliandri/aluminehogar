@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
-import { X, Search, FileDown, Send, Trash2, Lock, Percent } from 'lucide-react';
+import { X, Search, FileDown, Send, Trash2, Percent } from 'lucide-react';
 import { CloudinaryImage } from './CloudinaryImage';
 import jsPDF from 'jspdf';
 import { enviarPresupuesto } from '../services/api';
+import { useAuthStore } from '../store/authStore';
 
 export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
+  const { user, isVendedor } = useAuthStore();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [carritoVendedor, setCarritoVendedor] = useState({});
-  const [vendedor, setVendedor] = useState({ nombre: '' });
+  const [vendedor, setVendedor] = useState({ nombre: user?.nombre || '' });
   const [cliente, setCliente] = useState({
     nombre: '',
     telefono: '',
@@ -26,18 +26,6 @@ export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
     'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero',
     'Tierra del Fuego', 'Tucumán'
   ];
-
-  // Autenticación
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (password === import.meta.env.VITE_VENDEDOR_PASSWORD) {
-      setIsAuthenticated(true);
-      setPassword('');
-    } else {
-      alert('Contraseña incorrecta');
-      setPassword('');
-    }
-  };
 
   // Filtrar productos según categoría
   const productosFiltrados = selectedCategory
@@ -259,49 +247,13 @@ export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
 
   if (!isOpen) return null;
 
-  // Pantalla de login
-  if (!isAuthenticated) {
+  // Defensa en profundidad: si alguien llega a abrir el modal sin rol vendedor/admin, no se muestra
+  if (!isVendedor()) {
     return (
       <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Acceso Vendedores</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Lock className="w-4 h-4 inline mr-2" />
-                Contraseña
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-field"
-                placeholder="Ingrese la contraseña"
-                required
-                autoFocus
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full btn-primary"
-            >
-              Ingresar
-            </button>
-          </form>
-
-          <p className="text-xs text-gray-500 text-center mt-4">
-            Solo personal autorizado
-          </p>
+        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 text-center">
+          <p className="text-gray-700 mb-4">No tenés permisos para acceder al panel de vendedores.</p>
+          <button onClick={onClose} className="btn-primary">Cerrar</button>
         </div>
       </div>
     );

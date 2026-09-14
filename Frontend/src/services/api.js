@@ -82,6 +82,48 @@ export const register = async (email, password, nombre, telefono) => {
   }
 };
 
+// =================== INVITACIONES ===================
+
+export const crearInvitacion = async (email, role) => {
+  try {
+    const response = await api.post('/invitations?action=create', { email, role });
+    return response.data;
+  } catch (error) {
+    console.error('Error al crear invitación:', error);
+    throw error;
+  }
+};
+
+export const listarInvitaciones = async () => {
+  try {
+    const response = await api.get('/invitations?action=list');
+    return response.data;
+  } catch (error) {
+    console.error('Error al listar invitaciones:', error);
+    throw error;
+  }
+};
+
+export const revocarInvitacion = async (id) => {
+  try {
+    const response = await api.post('/invitations?action=revoke', { id });
+    return response.data;
+  } catch (error) {
+    console.error('Error al revocar invitación:', error);
+    throw error;
+  }
+};
+
+export const aceptarInvitacion = async (token, { password, nombre, telefono }) => {
+  try {
+    const response = await api.post('/invitations?action=accept', { token, password, nombre, telefono });
+    return response.data;
+  } catch (error) {
+    console.error('Error al aceptar invitación:', error);
+    throw error;
+  }
+};
+
 // =================== VENTAS / PRESUPUESTOS ===================
 
 export const guardarVenta = async (ventaData) => {

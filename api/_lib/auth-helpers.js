@@ -62,10 +62,17 @@ export function extractTokenFromRequest(req) {
 }
 
 /**
+ * Verifica que el usuario tenga alguno de los roles permitidos
+ */
+export function requireRole(decoded, roles = []) {
+  if (!roles.includes(decoded.role)) {
+    throw new Error(`Acceso denegado: se requiere rol ${roles.join(' o ')}`);
+  }
+}
+
+/**
  * Verifica que el usuario sea admin
  */
 export function requireAdmin(decoded) {
-  if (decoded.role !== 'admin') {
-    throw new Error('Acceso denegado: se requiere rol de administrador');
-  }
+  requireRole(decoded, ['admin']);
 }

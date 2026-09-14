@@ -12,11 +12,13 @@ import {
   eliminarProducto,
   subirImagen
 } from '../services/api';
+import { InvitationsPanel } from '../components/InvitationsPanel';
 
 export default function AdminPanel() {
   const { user, isAdmin } = useAuthStore();
   const navigate = useNavigate();
 
+  const [activeTab, setActiveTab] = useState('productos');
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -76,14 +78,43 @@ export default function AdminPanel() {
     <div className="container mx-auto p-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Panel de Administración</h1>
+        {activeTab === 'productos' && (
+          <button
+            onClick={handleCreate}
+            className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+          >
+            + Crear Producto
+          </button>
+        )}
+      </div>
+
+      <div className="flex space-x-2 mb-6 border-b">
         <button
-          onClick={handleCreate}
-          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+          onClick={() => setActiveTab('productos')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            activeTab === 'productos'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
         >
-          + Crear Producto
+          Productos
+        </button>
+        <button
+          onClick={() => setActiveTab('usuarios')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            activeTab === 'usuarios'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Usuarios e invitaciones
         </button>
       </div>
 
+      {activeTab === 'usuarios' && <InvitationsPanel />}
+
+      {activeTab === 'productos' && (
+      <>
       {showForm && (
         <ProductForm
           producto={editingProduct}
@@ -174,6 +205,8 @@ export default function AdminPanel() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

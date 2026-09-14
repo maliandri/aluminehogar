@@ -91,6 +91,12 @@ export const useAuthStore = create(
         return user?.role === 'admin';
       },
 
+      // Verificar si es vendedor (el admin también tiene acceso a funciones de vendedor)
+      isVendedor: () => {
+        const { user } = get();
+        return user?.role === 'vendedor' || user?.role === 'admin';
+      },
+
       // Verificar sesión guardada
       checkAuth: () => {
         const token = localStorage.getItem('authToken');
