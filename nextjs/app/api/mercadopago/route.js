@@ -3,8 +3,11 @@ import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { connectDB } from '@/lib/db';
 import Order from '@/lib/models/Order';
 import PaymentSettings from '@/lib/models/PaymentSettings';
+import MedioPago from '@/lib/models/MedioPago';
+import Promocion from '@/lib/models/Promocion';
 import { extractTokenFromHeaders, verifyToken } from '@/lib/auth-helpers';
 import { enviarEmail } from '@/lib/email';
+import { productoAplica, vigente } from '@/lib/pricing';
 
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || ''
@@ -22,7 +25,7 @@ export async function POST(request) {
       }
 
       const decoded = verifyToken(token);
-      const { items, payer, shippingAddress } = await request.json();
+      const { items, payer, shippingAddress, medioPagoId } = await request.json();
 
       if (!items || items.length === 0) {
         return NextResponse.json({ error: 'Debe incluir al menos un producto' }, { status: 400 });
@@ -34,14 +37,38 @@ export async function POST(request) {
 
       await connectDB();
       const settings = await PaymentSettings.findById('default');
-      const maxCuotas = settings?.maxCuotasMercadoPago || 12;
+      let maxCuotas = settings?.maxCuotasMercadoPago || 12;
+
+      const [medioPago, promociones] = await Promise.all([
+        medioPagoId ? MedioPago.findById(medioPagoId) : null,
+        Promocion.find({ activo: true, scope: 'online', tipo: 'descuento' })
+      ]);
+
+      if (medioPago && medioPago.tipo === 'cuotas') {
+        maxCuotas = medioPago.cantidadCuotas || maxCuotas;
+      }
+
+      const itemsAjustados = items.map(item => {
+        let precio = parseFloat(item.precio);
+
+        const promoAplicable = promociones.find(p => vigente(p) && productoAplica(p, item));
+        if (promoAplicable) {
+          precio = precio * (1 - (promoAplicable.descuentoPorcentaje || 0) / 100);
+        }
+
+        if (medioPago && productoAplica(medioPago, item)) {
+          precio = precio * (1 + (medioPago.tasaInteres || 0) / 100);
+        }
+
+        return { ...item, precio };
+      });
 
       const preferenceData = {
-        items: items.map(item => ({
+        items: itemsAjustados.map(item => ({
           title: item.nombre,
           description: item.descripcion?.substring(0, 100) || '',
           quantity: item.quantity || 1,
-          unit_price: parseFloat(item.precio),
+          unit_price: parseFloat(item.precio.toFixed(2)),
           currency_id: 'ARS',
           picture_url: item.imagen || ''
         })),

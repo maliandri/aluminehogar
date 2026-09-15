@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/store/cartStore';
 import { useAuthStore } from '@/store/authStore';
-import { crearPreferenciaPago } from '@/services/api';
+import { crearPreferenciaPago, listarMediosPago } from '@/services/api';
+import { calcularTotalConMedioPago, productoAplica } from '@/lib/pricing';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -22,9 +23,25 @@ export default function CheckoutPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [mediosPago, setMediosPago] = useState([]);
+  const [medioPagoId, setMedioPagoId] = useState('');
+
+  useEffect(() => {
+    listarMediosPago('online').then((data) => setMediosPago(data.mediosPago || [])).catch(() => {});
+  }, []);
 
   const cartItems = Object.values(cart);
   const totalPrice = getTotalPrice();
+
+  const medioSeleccionado = mediosPago.find((m) => m._id === medioPagoId);
+  const itemsParaCalculo = cartItems.map((item) => ({
+    producto: { _id: item._id, categoria: item.categoria, marca: item.marca },
+    precio: item.precio,
+    cantidad: item.cantidad
+  }));
+  const totalConMedio = medioSeleccionado
+    ? calcularTotalConMedioPago(itemsParaCalculo, medioSeleccionado)
+    : totalPrice;
 
   const handlePagar = async () => {
     setError('');
@@ -41,14 +58,17 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const items = cartItems.map((item) => ({
+        _id: item._id,
         nombre: item.nombre,
         descripcion: item.descripcion || '',
+        categoria: item.categoria,
+        marca: item.marca,
         quantity: item.cantidad,
         precio: item.precio,
         imagen: item.imagenOptimizada?.card || item.imagen || ''
       }));
 
-      const data = await crearPreferenciaPago(items, payer, shippingAddress);
+      const data = await crearPreferenciaPago(items, payer, shippingAddress, medioPagoId || undefined);
       window.location.href = data.initPoint;
     } catch (err) {
       setError(err.response?.data?.error || 'No se pudo iniciar el pago. Intenta nuevamente.');
@@ -137,6 +157,23 @@ export default function CheckoutPage() {
             className="border rounded px-3 py-2 col-span-2" />
         </div>
       </div>
+
+      {mediosPago.length > 0 && (
+        <div className="bg-white shadow rounded-lg p-6 mb-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Medio de pago</h2>
+          <select value={medioPagoId} onChange={(e) => setMedioPagoId(e.target.value)} className="w-full border rounded px-3 py-2 mb-2">
+            <option value="">Tarjeta (cuotas segun banco)</option>
+            {mediosPago.map((m) => (
+              <option key={m._id} value={m._id}>{m.nombre}{m.tasaInteres ? ` (+${m.tasaInteres}%)` : ''}</option>
+            ))}
+          </select>
+          {medioSeleccionado && (
+            <p className="text-sm text-gray-600">
+              Total con {medioSeleccionado.nombre}: <strong>${Math.round(totalConMedio).toLocaleString('es-AR')}</strong>
+            </p>
+          )}
+        </div>
+      )}
 
       <button
         onClick={handlePagar}

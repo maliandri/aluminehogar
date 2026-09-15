@@ -14,7 +14,9 @@ const CreditoVentaSchema = new mongoose.Schema({
   clienteEmail: { type: String },
   vendedorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   vendedorNombre: { type: String },
+  depositoId: { type: String, default: null },
   productos: [{
+    productId: String,
     nombre: String,
     precio: Number,
     cantidad: Number

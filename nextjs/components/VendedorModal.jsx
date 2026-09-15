@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { X, FileDown, Send, Trash2, Percent, CreditCard, List } from 'lucide-react';
 import { CloudinaryImage } from './CloudinaryImage';
 import jsPDF from 'jspdf';
-import { enviarPresupuesto, crearCredito, listarCreditos, marcarCuotaCredito } from '@/services/api';
+import { enviarPresupuesto, crearCredito, listarCreditos, marcarCuotaCredito, listarDepositos, listarMediosPago, listarPromociones } from '@/services/api';
+import { calcularTotalConMedioPago, productoAplica } from '@/lib/pricing';
 
 export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
   const [activeTab, setActiveTab] = useState('presupuesto');
@@ -331,6 +332,9 @@ export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
                 </div>
               </div>
 
+              <MedioPagoSelector carritoVendedor={carritoVendedor} calcularTotal={calcularTotal} />
+              <PromoComboAviso carritoVendedor={carritoVendedor} />
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button onClick={handleDescargarPDF} className="btn-primary flex items-center justify-center gap-2">
                   <FileDown className="w-4 h-4" /><span>PDF</span>
@@ -366,8 +370,18 @@ export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
 function OtorgarCreditoTab({ carritoVendedor, cliente, setCliente, calcularTotal, onCreado }) {
   const [anticipoPorcentaje, setAnticipoPorcentaje] = useState(20);
   const [cantidadCuotas, setCantidadCuotas] = useState(3);
+  const [depositos, setDepositos] = useState([]);
+  const [depositoId, setDepositoId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    listarDepositos().then((data) => {
+      const virtuales = (data.depositos || []).filter(d => d.esVirtualVendedor && d.activo);
+      setDepositos(virtuales);
+      if (virtuales.length > 0) setDepositoId(virtuales[0]._id);
+    }).catch(() => {});
+  }, []);
 
   const montoTotal = calcularTotal();
   const anticipo = Math.round(montoTotal * (anticipoPorcentaje / 100));
@@ -391,7 +405,8 @@ function OtorgarCreditoTab({ carritoVendedor, cliente, setCliente, calcularTotal
         clienteNombre: cliente.nombre,
         clienteTelefono: cliente.telefono,
         clienteEmail: cliente.email,
-        productos: items.map(i => ({ nombre: i.nombre, precio: i.precio, cantidad: i.cantidad })),
+        depositoId: depositoId || null,
+        productos: items.map(i => ({ productId: i._id, nombre: i.nombre, precio: i.precio, cantidad: i.cantidad })),
         montoTotal,
         anticipo,
         cantidadCuotas
@@ -444,6 +459,14 @@ function OtorgarCreditoTab({ carritoVendedor, cliente, setCliente, calcularTotal
             </p>
           )}
         </div>
+        {depositos.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium mb-1">Deposito de origen</label>
+            <select value={depositoId} onChange={(e) => setDepositoId(e.target.value)} className="input-field">
+              {depositos.map(d => (<option key={d._id} value={d._id}>{d.nombre}</option>))}
+            </select>
+          </div>
+        )}
       </div>
 
       <button onClick={handleOtorgar} disabled={loading} className="w-full btn-primary disabled:opacity-50">
@@ -531,6 +554,75 @@ function MisCreditosTab({ isOpen }) {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function PromoComboAviso({ carritoVendedor }) {
+  const [promociones, setPromociones] = useState([]);
+
+  useEffect(() => {
+    listarPromociones('vendedor').then((data) => setPromociones(data.promociones || [])).catch(() => {});
+  }, []);
+
+  const items = Object.values(carritoVendedor);
+  const combosAplicables = promociones.filter(
+    p => p.tipo === 'combo' && items.some(i => productoAplica(p, { _id: i._id, categoria: i.categoria, marca: i.marca }))
+  );
+
+  if (combosAplicables.length === 0) return null;
+
+  return (
+    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 text-sm">
+      <p className="font-semibold text-yellow-800 mb-1">Promociones combo disponibles</p>
+      {combosAplicables.map(p => (
+        <p key={p._id} className="text-yellow-700">
+          {p.nombre}: {p.comboProductoRegaloId
+            ? 'incluye un producto de regalo'
+            : `${p.comboDescuentoSegundoProducto}% de descuento en un segundo producto`}
+          . Aplicalo manualmente ajustando cantidad/descuento en el carrito.
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function MedioPagoSelector({ carritoVendedor, calcularTotal }) {
+  const [mediosPago, setMediosPago] = useState([]);
+  const [seleccionado, setSeleccionado] = useState('');
+
+  useEffect(() => {
+    listarMediosPago('vendedor').then((data) => setMediosPago(data.mediosPago || [])).catch(() => {});
+  }, []);
+
+  if (mediosPago.length === 0) return null;
+
+  const items = Object.values(carritoVendedor).map(i => ({
+    producto: { _id: i._id, categoria: i.categoria, marca: i.marca },
+    precio: i.precio * (1 - (i.descuento || 0) / 100),
+    cantidad: i.cantidad
+  }));
+
+  const medio = mediosPago.find(m => m._id === seleccionado);
+  const totalConMedio = medio ? calcularTotalConMedioPago(items, medio) : calcularTotal();
+  const aplicaAlgun = medio && items.some(i => productoAplica(medio, i.producto));
+
+  return (
+    <div className="bg-gray-50 p-4 rounded-lg mb-4">
+      <label className="block text-sm font-medium mb-2">Medio de pago</label>
+      <select value={seleccionado} onChange={(e) => setSeleccionado(e.target.value)} className="input-field mb-2">
+        <option value="">Sin especificar</option>
+        {mediosPago.map(m => (<option key={m._id} value={m._id}>{m.nombre} ({m.tasaInteres}%)</option>))}
+      </select>
+      {medio && (
+        <div className="text-sm">
+          {aplicaAlgun ? (
+            <p className="font-semibold">Total con {medio.nombre}: ${Math.round(totalConMedio).toLocaleString('es-AR')}</p>
+          ) : (
+            <p className="text-gray-500">Este medio de pago no aplica a los productos seleccionados.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

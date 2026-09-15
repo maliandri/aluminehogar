@@ -3,7 +3,29 @@ import { connectDB } from '@/lib/db';
 import CreditoVenta from '@/lib/models/CreditoVenta';
 import PaymentSettings from '@/lib/models/PaymentSettings';
 import User from '@/lib/models/User';
+import Product from '@/lib/models/Product';
 import { extractTokenFromHeaders, verifyToken, requireRole } from '@/lib/auth-helpers';
+
+async function ajustarStockDeposito(productos, depositoId, delta) {
+  if (!depositoId) return;
+  for (const item of productos) {
+    if (!item.productId) continue;
+    const producto = await Product.findById(item.productId);
+    if (!producto) continue;
+
+    const stockPorDeposito = producto.stockPorDeposito || [];
+    const entrada = stockPorDeposito.find(d => d.depositoId === depositoId);
+    if (entrada) {
+      entrada.cantidad = Math.max(0, entrada.cantidad + delta * item.cantidad);
+    } else if (delta > 0) {
+      stockPorDeposito.push({ depositoId, cantidad: delta * item.cantidad });
+    }
+
+    producto.stockPorDeposito = stockPorDeposito;
+    producto.stock = stockPorDeposito.reduce((sum, d) => sum + d.cantidad, 0);
+    await producto.save();
+  }
+}
 
 function authenticate(request, roles) {
   const token = extractTokenFromHeaders(request.headers);
@@ -53,7 +75,7 @@ export async function POST(request) {
     if (action === 'create') {
       const decoded = authenticate(request, ['vendedor', 'admin']);
 
-      const { clienteNombre, clienteTelefono, clienteEmail, productos, montoTotal, anticipo, cantidadCuotas } = body;
+      const { clienteNombre, clienteTelefono, clienteEmail, productos, montoTotal, anticipo, cantidadCuotas, depositoId } = body;
 
       if (!clienteNombre || !montoTotal || !cantidadCuotas) {
         return NextResponse.json({ error: 'Cliente, monto total y cantidad de cuotas son requeridos' }, { status: 400 });
@@ -79,6 +101,7 @@ export async function POST(request) {
         clienteEmail,
         vendedorId: decoded.userId,
         vendedorNombre: vendedorUser?.nombre || vendedorUser?.email || '',
+        depositoId: depositoId || null,
         productos: productos || [],
         montoTotal,
         anticipo: anticipo || 0,
@@ -87,6 +110,9 @@ export async function POST(request) {
         estado: excedeLimites ? 'pendiente_aprobacion' : 'activo'
       });
       await credito.save();
+
+      // Descuenta stock del deposito elegido (si el vendedor especifico uno)
+      await ajustarStockDeposito(credito.productos, depositoId, -1);
 
       return NextResponse.json({ success: true, credito }, { status: 201 });
     }
@@ -142,6 +168,10 @@ export async function POST(request) {
 
       credito.estado = action === 'aprobar' ? 'activo' : 'rechazado';
       await credito.save();
+
+      if (action === 'rechazar') {
+        await ajustarStockDeposito(credito.productos, credito.depositoId, 1);
+      }
 
       return NextResponse.json({ success: true, credito });
     }

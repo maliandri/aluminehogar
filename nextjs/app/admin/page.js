@@ -27,6 +27,18 @@ import {
   rechazarCredito,
   getPaymentSettings,
   actualizarPaymentSettings,
+  listarDepositos,
+  crearDeposito,
+  actualizarDeposito,
+  eliminarDeposito,
+  listarMediosPago,
+  crearMedioPago,
+  actualizarMedioPago,
+  eliminarMedioPago,
+  listarPromociones,
+  crearPromocion,
+  actualizarPromocion,
+  eliminarPromocion,
 } from '@/services/api';
 
 export default function AdminPanel() {
@@ -256,7 +268,40 @@ export default function AdminPanel() {
           }`}
         >
           <CreditCard className="w-4 h-4" />
-          Creditos y pagos
+          Creditos
+        </button>
+        <button
+          onClick={() => setActiveTab('depositos')}
+          className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
+            activeTab === 'depositos'
+              ? 'border-b-2 border-blue-600 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          Depositos
+        </button>
+        <button
+          onClick={() => setActiveTab('medios-pago')}
+          className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
+            activeTab === 'medios-pago'
+              ? 'border-b-2 border-blue-600 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <CreditCard className="w-4 h-4" />
+          Medios de pago
+        </button>
+        <button
+          onClick={() => setActiveTab('promociones')}
+          className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
+            activeTab === 'promociones'
+              ? 'border-b-2 border-blue-600 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          Promociones
         </button>
       </div>
 
@@ -452,6 +497,12 @@ export default function AdminPanel() {
       {activeTab === 'usuarios' && <UsersPanel currentUserId={user?.id} />}
 
       {activeTab === 'creditos' && <CreditosPanel />}
+
+      {activeTab === 'depositos' && <DepositosPanel />}
+
+      {activeTab === 'medios-pago' && <MediosPagoPanel />}
+
+      {activeTab === 'promociones' && <PromocionesPanel />}
     </div>
   );
 }
@@ -899,6 +950,474 @@ function CreditosPanel() {
   );
 }
 
+// =================== DEPOSITOS PANEL ===================
+
+function DepositosPanel() {
+  const [depositos, setDepositos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ codigo: '', nombre: '', esVirtualVendedor: false });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { fetchDepositos(); }, []);
+
+  const fetchDepositos = async () => {
+    try {
+      setLoading(true);
+      const data = await listarDepositos();
+      setDepositos(data.depositos || []);
+    } catch {
+      alert('Error al cargar depositos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCrear = async (e) => {
+    e.preventDefault();
+    if (!form.codigo || !form.nombre) return;
+    setSaving(true);
+    try {
+      await crearDeposito(form);
+      setForm({ codigo: '', nombre: '', esVirtualVendedor: false });
+      fetchDepositos();
+    } catch (e) {
+      alert(e.response?.data?.error || 'Error al crear el deposito');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleActivo = async (deposito) => {
+    try {
+      await actualizarDeposito(deposito._id, { activo: !deposito.activo });
+      fetchDepositos();
+    } catch (e) {
+      alert(e.response?.data?.error || 'Error al actualizar');
+    }
+  };
+
+  const handleEliminar = async (id) => {
+    if (!confirm('¿Eliminar este deposito?')) return;
+    try {
+      await eliminarDeposito(id);
+      fetchDepositos();
+    } catch (e) {
+      alert(e.response?.data?.error || 'Error al eliminar');
+    }
+  };
+
+  if (loading) return <div className="text-center py-12 text-gray-500">Cargando...</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-semibold mb-4">Nuevo deposito</h3>
+        <form onSubmit={handleCrear} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Codigo</label>
+            <input type="text" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })}
+              className="border rounded px-3 py-2 text-sm" placeholder="001" />
+          </div>
+          <div className="flex-1">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+            <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+              className="w-full border rounded px-3 py-2 text-sm" placeholder="Deposito Limansky" />
+          </div>
+          <label className="flex items-center gap-2 text-sm mb-2">
+            <input type="checkbox" checked={form.esVirtualVendedor}
+              onChange={(e) => setForm({ ...form, esVirtualVendedor: e.target.checked })} />
+            Deposito virtual para vendedores
+          </label>
+          <button type="submit" disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400">
+            {saving ? 'Creando...' : 'Crear'}
+          </button>
+        </form>
+      </div>
+
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <table className="min-w-full">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Codigo</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Nombre</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Virtual vendedor</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Estado</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {depositos.map((d) => (
+              <tr key={d._id}>
+                <td className="px-4 py-3 text-sm">{d.codigo}</td>
+                <td className="px-4 py-3 text-sm">{d.nombre}</td>
+                <td className="px-4 py-3 text-sm">{d.esVirtualVendedor ? 'Si' : 'No'}</td>
+                <td className="px-4 py-3 text-sm">{d.activo ? 'Activo' : 'Inactivo'}</td>
+                <td className="px-4 py-3 text-right text-sm space-x-2">
+                  <button onClick={() => handleToggleActivo(d)} className="text-blue-600 hover:underline">
+                    {d.activo ? 'Desactivar' : 'Activar'}
+                  </button>
+                  <button onClick={() => handleEliminar(d._id)} className="text-red-600 hover:underline">Eliminar</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {depositos.length === 0 && <div className="text-center py-12 text-gray-500">No hay depositos creados.</div>}
+      </div>
+    </div>
+  );
+}
+
+// =================== MEDIOS DE PAGO PANEL ===================
+
+const APLICA_A_LABELS = { todos: 'Todos los productos', categoria: 'Categoria', marca: 'Marca', producto: 'Producto especifico' };
+
+function MediosPagoPanel() {
+  const [mediosPago, setMediosPago] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({
+    nombre: '', tipo: 'unico', tasaInteres: 0, cantidadCuotas: 1,
+    scope: ['online', 'vendedor'], aplicaA: 'todos', aplicaAValores: ''
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { fetchMediosPago(); }, []);
+
+  const fetchMediosPago = async () => {
+    try {
+      setLoading(true);
+      const data = await listarMediosPago();
+      setMediosPago(data.mediosPago || []);
+    } catch {
+      alert('Error al cargar medios de pago');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleScope = (s) => {
+    setForm((prev) => ({
+      ...prev,
+      scope: prev.scope.includes(s) ? prev.scope.filter(x => x !== s) : [...prev.scope, s]
+    }));
+  };
+
+  const handleCrear = async (e) => {
+    e.preventDefault();
+    if (!form.nombre) return;
+    setSaving(true);
+    try {
+      await crearMedioPago({
+        ...form,
+        aplicaAValores: form.aplicaAValores ? form.aplicaAValores.split(',').map(v => v.trim()).filter(Boolean) : []
+      });
+      setForm({ nombre: '', tipo: 'unico', tasaInteres: 0, cantidadCuotas: 1, scope: ['online', 'vendedor'], aplicaA: 'todos', aplicaAValores: '' });
+      fetchMediosPago();
+    } catch (e) {
+      alert(e.response?.data?.error || 'Error al crear el medio de pago');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleActivo = async (medio) => {
+    try {
+      await actualizarMedioPago(medio._id, { activo: !medio.activo });
+      fetchMediosPago();
+    } catch (e) {
+      alert(e.response?.data?.error || 'Error al actualizar');
+    }
+  };
+
+  const handleEliminar = async (id) => {
+    if (!confirm('¿Eliminar este medio de pago?')) return;
+    try {
+      await eliminarMedioPago(id);
+      fetchMediosPago();
+    } catch (e) {
+      alert(e.response?.data?.error || 'Error al eliminar');
+    }
+  };
+
+  if (loading) return <div className="text-center py-12 text-gray-500">Cargando...</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-semibold mb-4">Nuevo medio de pago</h3>
+        <form onSubmit={handleCrear} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+            <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+              className="w-full border rounded px-3 py-2 text-sm" placeholder="Tarjeta 3 cuotas" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
+            <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} className="w-full border rounded px-3 py-2 text-sm">
+              <option value="unico">Pago unico</option>
+              <option value="cuotas">Cuotas</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Tasa de interes (%)</label>
+            <input type="number" min="0" value={form.tasaInteres}
+              onChange={(e) => setForm({ ...form, tasaInteres: Number(e.target.value) })}
+              className="w-full border rounded px-3 py-2 text-sm" />
+          </div>
+          {form.tipo === 'cuotas' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad de cuotas</label>
+              <input type="number" min="1" max="24" value={form.cantidadCuotas}
+                onChange={(e) => setForm({ ...form, cantidadCuotas: Number(e.target.value) })}
+                className="w-full border rounded px-3 py-2 text-sm" />
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Aplica a</label>
+            <select value={form.aplicaA} onChange={(e) => setForm({ ...form, aplicaA: e.target.value })} className="w-full border rounded px-3 py-2 text-sm">
+              {Object.entries(APLICA_A_LABELS).map(([k, v]) => (<option key={k} value={k}>{v}</option>))}
+            </select>
+          </div>
+          {form.aplicaA !== 'todos' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Valores ({form.aplicaA === 'producto' ? 'IDs' : form.aplicaA}, separados por coma)
+              </label>
+              <input type="text" value={form.aplicaAValores} onChange={(e) => setForm({ ...form, aplicaAValores: e.target.value })}
+                className="w-full border rounded px-3 py-2 text-sm" placeholder="Colchón, Heladera Exhibidora" />
+            </div>
+          )}
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.scope.includes('online')} onChange={() => toggleScope('online')} /> Online
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.scope.includes('vendedor')} onChange={() => toggleScope('vendedor')} /> Vendedor
+            </label>
+          </div>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <button type="submit" disabled={saving} className="bg-blue-600 text-white px-6 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400">
+              {saving ? 'Creando...' : 'Crear medio de pago'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="bg-white shadow rounded-lg overflow-hidden overflow-x-auto">
+        <table className="min-w-full">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Nombre</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Tipo</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Tasa</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Aplica a</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Scope</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Estado</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {mediosPago.map((m) => (
+              <tr key={m._id}>
+                <td className="px-4 py-3 text-sm">{m.nombre}</td>
+                <td className="px-4 py-3 text-sm">{m.tipo === 'cuotas' ? `${m.cantidadCuotas} cuotas` : 'Unico'}</td>
+                <td className="px-4 py-3 text-sm">{m.tasaInteres}%</td>
+                <td className="px-4 py-3 text-sm">{APLICA_A_LABELS[m.aplicaA]}{m.aplicaAValores?.length ? `: ${m.aplicaAValores.join(', ')}` : ''}</td>
+                <td className="px-4 py-3 text-sm">{m.scope.join(', ')}</td>
+                <td className="px-4 py-3 text-sm">{m.activo ? 'Activo' : 'Inactivo'}</td>
+                <td className="px-4 py-3 text-right text-sm space-x-2">
+                  <button onClick={() => handleToggleActivo(m)} className="text-blue-600 hover:underline">
+                    {m.activo ? 'Desactivar' : 'Activar'}
+                  </button>
+                  <button onClick={() => handleEliminar(m._id)} className="text-red-600 hover:underline">Eliminar</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {mediosPago.length === 0 && <div className="text-center py-12 text-gray-500">No hay medios de pago creados.</div>}
+      </div>
+    </div>
+  );
+}
+
+// =================== PROMOCIONES PANEL ===================
+
+function PromocionesPanel() {
+  const [promociones, setPromociones] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({
+    nombre: '', tipo: 'descuento', scope: ['online', 'vendedor'],
+    aplicaA: 'todos', aplicaAValores: '', descuentoPorcentaje: 10,
+    comboProductoRegaloId: '', comboDescuentoSegundoProducto: 0
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { fetchPromociones(); }, []);
+
+  const fetchPromociones = async () => {
+    try {
+      setLoading(true);
+      const data = await listarPromociones();
+      setPromociones(data.promociones || []);
+    } catch {
+      alert('Error al cargar promociones');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleScope = (s) => {
+    setForm((prev) => ({
+      ...prev,
+      scope: prev.scope.includes(s) ? prev.scope.filter(x => x !== s) : [...prev.scope, s]
+    }));
+  };
+
+  const handleCrear = async (e) => {
+    e.preventDefault();
+    if (!form.nombre) return;
+    setSaving(true);
+    try {
+      await crearPromocion({
+        ...form,
+        aplicaAValores: form.aplicaAValores ? form.aplicaAValores.split(',').map(v => v.trim()).filter(Boolean) : []
+      });
+      setForm({ nombre: '', tipo: 'descuento', scope: ['online', 'vendedor'], aplicaA: 'todos', aplicaAValores: '', descuentoPorcentaje: 10, comboProductoRegaloId: '', comboDescuentoSegundoProducto: 0 });
+      fetchPromociones();
+    } catch (e) {
+      alert(e.response?.data?.error || 'Error al crear la promocion');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleActivo = async (promo) => {
+    try {
+      await actualizarPromocion(promo._id, { activo: !promo.activo });
+      fetchPromociones();
+    } catch (e) {
+      alert(e.response?.data?.error || 'Error al actualizar');
+    }
+  };
+
+  const handleEliminar = async (id) => {
+    if (!confirm('¿Eliminar esta promocion?')) return;
+    try {
+      await eliminarPromocion(id);
+      fetchPromociones();
+    } catch (e) {
+      alert(e.response?.data?.error || 'Error al eliminar');
+    }
+  };
+
+  if (loading) return <div className="text-center py-12 text-gray-500">Cargando...</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-semibold mb-4">Nueva promocion</h3>
+        <form onSubmit={handleCrear} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+            <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+              className="w-full border rounded px-3 py-2 text-sm" placeholder="Descuento verano" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
+            <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} className="w-full border rounded px-3 py-2 text-sm">
+              <option value="descuento">Descuento simple</option>
+              <option value="combo">Combo (regalo / 2do producto)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Aplica a</label>
+            <select value={form.aplicaA} onChange={(e) => setForm({ ...form, aplicaA: e.target.value })} className="w-full border rounded px-3 py-2 text-sm">
+              {Object.entries(APLICA_A_LABELS).map(([k, v]) => (<option key={k} value={k}>{v}</option>))}
+            </select>
+          </div>
+          {form.aplicaA !== 'todos' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Valores (separados por coma)</label>
+              <input type="text" value={form.aplicaAValores} onChange={(e) => setForm({ ...form, aplicaAValores: e.target.value })}
+                className="w-full border rounded px-3 py-2 text-sm" placeholder="Colchón" />
+            </div>
+          )}
+          {form.tipo === 'descuento' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Descuento (%)</label>
+              <input type="number" min="0" max="90" value={form.descuentoPorcentaje}
+                onChange={(e) => setForm({ ...form, descuentoPorcentaje: Number(e.target.value) })}
+                className="w-full border rounded px-3 py-2 text-sm" />
+            </div>
+          )}
+          {form.tipo === 'combo' && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">ID producto de regalo (opcional)</label>
+                <input type="text" value={form.comboProductoRegaloId} onChange={(e) => setForm({ ...form, comboProductoRegaloId: e.target.value })}
+                  className="w-full border rounded px-3 py-2 text-sm" placeholder="ID del producto" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Descuento 2do producto (%)</label>
+                <input type="number" min="0" max="100" value={form.comboDescuentoSegundoProducto}
+                  onChange={(e) => setForm({ ...form, comboDescuentoSegundoProducto: Number(e.target.value) })}
+                  className="w-full border rounded px-3 py-2 text-sm" />
+              </div>
+            </>
+          )}
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.scope.includes('online')} onChange={() => toggleScope('online')} /> Online
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.scope.includes('vendedor')} onChange={() => toggleScope('vendedor')} /> Vendedor
+            </label>
+          </div>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <button type="submit" disabled={saving} className="bg-blue-600 text-white px-6 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400">
+              {saving ? 'Creando...' : 'Crear promocion'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="bg-white shadow rounded-lg overflow-hidden overflow-x-auto">
+        <table className="min-w-full">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Nombre</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Tipo</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Aplica a</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Scope</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Estado</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {promociones.map((p) => (
+              <tr key={p._id}>
+                <td className="px-4 py-3 text-sm">{p.nombre}</td>
+                <td className="px-4 py-3 text-sm">{p.tipo === 'descuento' ? `${p.descuentoPorcentaje}% off` : 'Combo'}</td>
+                <td className="px-4 py-3 text-sm">{APLICA_A_LABELS[p.aplicaA]}{p.aplicaAValores?.length ? `: ${p.aplicaAValores.join(', ')}` : ''}</td>
+                <td className="px-4 py-3 text-sm">{p.scope.join(', ')}</td>
+                <td className="px-4 py-3 text-sm">{p.activo ? 'Activo' : 'Inactivo'}</td>
+                <td className="px-4 py-3 text-right text-sm space-x-2">
+                  <button onClick={() => handleToggleActivo(p)} className="text-blue-600 hover:underline">
+                    {p.activo ? 'Desactivar' : 'Activar'}
+                  </button>
+                  <button onClick={() => handleEliminar(p._id)} className="text-red-600 hover:underline">Eliminar</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {promociones.length === 0 && <div className="text-center py-12 text-gray-500">No hay promociones creadas.</div>}
+      </div>
+    </div>
+  );
+}
+
 // =================== CONVERSATIONS PANEL ===================
 
 function ConversationsPanel() {
@@ -1181,6 +1700,7 @@ function ProductForm({ producto, categorias, onClose, onSuccess }) {
     especificaciones: producto?.especificaciones || '',
     precio: producto?.precio || '',
     categoria: producto?.categoria || '',
+    marca: producto?.marca || '',
     medidas: producto?.medidas || '',
     imagen: producto?.imagen || '',
     imagenOptimizada: producto?.imagenOptimizada || '',
@@ -1397,6 +1917,11 @@ function ProductForm({ producto, categorias, onClose, onSuccess }) {
                   <option key={cat} value={cat} />
                 ))}
               </datalist>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Marca</label>
+              <input type="text" value={formData.marca} onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+                className="w-full border rounded px-3 py-2" placeholder="Ej: Sealy, Whirlpool" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Medidas</label>

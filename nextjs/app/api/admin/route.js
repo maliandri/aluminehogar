@@ -229,7 +229,7 @@ export async function POST(request) {
 
     // CREATE PRODUCT
     await connectDB();
-    const { nombre, descripcion, precio, categoria, medidas, imagen, imagenOptimizada, mostrar, stock } = await request.json();
+    const { nombre, descripcion, precio, categoria, marca, medidas, imagen, imagenOptimizada, mostrar, stock } = await request.json();
 
     if (!nombre || !precio || !categoria) {
       return NextResponse.json({ error: 'Nombre, precio y categoria son requeridos' }, { status: 400 });
@@ -240,6 +240,7 @@ export async function POST(request) {
       descripcion: descripcion || '',
       precio: parseFloat(precio),
       categoria,
+      marca: marca || '',
       medidas: medidas || '',
       imagen: imagen || '',
       imagenOptimizada: imagenOptimizada || '',
@@ -269,26 +270,37 @@ export async function PATCH(request) {
     const id = request.nextUrl.searchParams.get('id');
     const action = request.nextUrl.searchParams.get('action');
 
-    if (action !== 'user' || !id) {
+    if (!id || (action !== 'user' && action !== 'stock')) {
       return NextResponse.json({ error: 'Parametros invalidos' }, { status: 400 });
     }
 
     await connectDB();
     const body = await request.json();
-    const { role, banned } = body;
 
-    // UPDATE STOCK
+    // UPDATE STOCK (por deposito, o legacy: numero unico)
     if (action === 'stock') {
-      const { stock } = await request.json();
+      const db = Product.db;
+      const collection = db.collection('productos');
+
+      if (Array.isArray(body.stockPorDeposito)) {
+        const stockPorDeposito = body.stockPorDeposito.map(d => ({
+          depositoId: d.depositoId,
+          cantidad: Math.max(0, parseInt(d.cantidad) || 0)
+        }));
+        const stockTotal = stockPorDeposito.reduce((sum, d) => sum + d.cantidad, 0);
+        await collection.updateOne({ _id: id }, { $set: { stockPorDeposito, stock: stockTotal } });
+        return NextResponse.json({ success: true, stock: stockTotal, stockPorDeposito });
+      }
+
+      const { stock } = body;
       if (stock === undefined || isNaN(stock) || stock < 0) {
         return NextResponse.json({ error: 'Stock invalido' }, { status: 400 });
       }
-      await connectDB();
-      const db = Product.db;
-      const collection = db.collection('productos');
       await collection.updateOne({ _id: id }, { $set: { stock: parseInt(stock) } });
       return NextResponse.json({ success: true, stock: parseInt(stock) });
     }
+
+    const { role, banned } = body;
 
     // No permitir que el admin se modifique a si mismo
     if (id === decoded.userId) {

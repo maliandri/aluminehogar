@@ -286,14 +286,83 @@ export const actualizarPaymentSettings = async (settingsData) => {
   return response.data;
 };
 
+// =================== DEPOSITOS ===================
+
+export const listarDepositos = async () => {
+  const response = await api.get('/depositos');
+  return response.data;
+};
+
+export const crearDeposito = async (data) => {
+  const response = await api.post('/depositos', data);
+  return response.data;
+};
+
+export const actualizarDeposito = async (id, data) => {
+  const response = await api.put(`/depositos?id=${id}`, data);
+  return response.data;
+};
+
+export const eliminarDeposito = async (id) => {
+  const response = await api.delete(`/depositos?id=${id}`);
+  return response.data;
+};
+
+// =================== MEDIOS DE PAGO ===================
+
+export const listarMediosPago = async (scope) => {
+  const query = scope ? `?scope=${scope}` : '';
+  const response = await api.get(`/medios-pago${query}`);
+  return response.data;
+};
+
+export const crearMedioPago = async (data) => {
+  const response = await api.post('/medios-pago', data);
+  return response.data;
+};
+
+export const actualizarMedioPago = async (id, data) => {
+  const response = await api.put(`/medios-pago?id=${id}`, data);
+  return response.data;
+};
+
+export const eliminarMedioPago = async (id) => {
+  const response = await api.delete(`/medios-pago?id=${id}`);
+  return response.data;
+};
+
+// =================== PROMOCIONES ===================
+
+export const listarPromociones = async (scope) => {
+  const query = scope ? `?scope=${scope}` : '';
+  const response = await api.get(`/promociones${query}`);
+  return response.data;
+};
+
+export const crearPromocion = async (data) => {
+  const response = await api.post('/promociones', data);
+  return response.data;
+};
+
+export const actualizarPromocion = async (id, data) => {
+  const response = await api.put(`/promociones?id=${id}`, data);
+  return response.data;
+};
+
+export const eliminarPromocion = async (id) => {
+  const response = await api.delete(`/promociones?id=${id}`);
+  return response.data;
+};
+
 // =================== MERCADO PAGO ===================
 
-export const crearPreferenciaPago = async (items, payer, shippingAddress) => {
+export const crearPreferenciaPago = async (items, payer, shippingAddress, medioPagoId) => {
   try {
     const response = await api.post('/mercadopago?action=create', {
       items,
       payer,
-      shippingAddress
+      shippingAddress,
+      medioPagoId
     });
     return response.data;
   } catch (error) {
