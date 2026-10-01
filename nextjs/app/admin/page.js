@@ -18,6 +18,7 @@ import {
   actualizarUsuario,
   eliminarUsuario,
   actualizarStock,
+  actualizarMostrar,
   importarStockExcel,
   crearInvitacion,
   listarInvitaciones,
@@ -171,6 +172,16 @@ export default function AdminPanel() {
       await actualizarStock(id, stock);
     } catch {
       alert('Error al actualizar stock');
+      fetchProductos();
+    }
+  };
+
+  const handleMostrarChange = async (id, mostrar) => {
+    setProductos(prev => prev.map(p => p._id === id ? { ...p, mostrar } : p));
+    try {
+      await actualizarMostrar(id, mostrar);
+    } catch {
+      alert('Error al cambiar la visibilidad del producto');
       fetchProductos();
     }
   };
@@ -471,11 +482,25 @@ export default function AdminPanel() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        producto.mostrar === 'si' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {producto.mostrar === 'si' ? 'Si' : 'No'}
-                      </span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={producto.mostrar === 'si'}
+                        aria-label={`Mostrar ${producto.nombre} en la web`}
+                        onClick={() => handleMostrarChange(producto._id, producto.mostrar === 'si' ? 'no' : 'si')}
+                        className="inline-flex items-center gap-2"
+                      >
+                        <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          producto.mostrar === 'si' ? 'bg-green-500' : 'bg-gray-300'
+                        }`}>
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                            producto.mostrar === 'si' ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </span>
+                        <span className={`text-xs font-medium w-5 ${producto.mostrar === 'si' ? 'text-green-700' : 'text-gray-500'}`}>
+                          {producto.mostrar === 'si' ? 'Sí' : 'No'}
+                        </span>
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded text-xs ${

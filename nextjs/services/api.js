@@ -220,6 +220,11 @@ export const actualizarStock = async (id, stock) => {
   return response.data;
 };
 
+export const actualizarMostrar = async (id, mostrar) => {
+  const response = await api.patch(`/admin?action=mostrar&id=${id}`, { mostrar });
+  return response.data;
+};
+
 export const importarStockExcel = async (excelBase64) => {
   const response = await api.post('/admin?action=import-stock', { excelBase64 });
   return response.data;

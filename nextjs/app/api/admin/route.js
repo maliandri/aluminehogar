@@ -379,12 +379,24 @@ export async function PATCH(request) {
     const id = request.nextUrl.searchParams.get('id');
     const action = request.nextUrl.searchParams.get('action');
 
-    if (!id || (action !== 'user' && action !== 'stock')) {
+    if (!id || (action !== 'user' && action !== 'stock' && action !== 'mostrar')) {
       return NextResponse.json({ error: 'Parametros invalidos' }, { status: 400 });
     }
 
     await connectDB();
     const body = await request.json();
+
+    // PUBLICAR / OCULTAR PRODUCTO
+    if (action === 'mostrar') {
+      if (body.mostrar !== 'si' && body.mostrar !== 'no') {
+        return NextResponse.json({ error: 'Valor invalido' }, { status: 400 });
+      }
+      const result = await Product.db.collection('productos').updateOne({ _id: id }, { $set: { mostrar: body.mostrar } });
+      if (!result.matchedCount) {
+        return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, mostrar: body.mostrar });
+    }
 
     // UPDATE STOCK (por deposito, o legacy: numero unico)
     if (action === 'stock') {
