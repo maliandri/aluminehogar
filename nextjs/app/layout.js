@@ -7,6 +7,8 @@ import { WhatsAppButton } from '@/components/WhatsAppButton';
 import { FacebookPixel } from '@/components/FacebookPixel';
 import ChatBot from '@/components/ChatBot';
 import { PublicChrome } from '@/components/PublicChrome';
+import { SiteProvider } from '@/components/SiteProvider';
+import { getSiteConfig } from '@/lib/site-config';
 
 export const metadata = {
   metadataBase: new URL('https://aluminehogar.com.ar'),
@@ -39,7 +41,8 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const site = await getSiteConfig();
   return (
     <html lang="es">
       <head>
@@ -70,6 +73,7 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body className="font-sans">
+        <SiteProvider value={site}>
         <ClientProviders>
           <FacebookPixel />
           <div className="min-h-screen flex flex-col">
@@ -84,6 +88,7 @@ export default function RootLayout({ children }) {
             </PublicChrome>
           </div>
         </ClientProviders>
+        </SiteProvider>
 
         <Script
           src="https://analytics.ahrefs.com/analytics.js"
