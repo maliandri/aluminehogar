@@ -401,3 +401,10 @@ export const importarImagenUrl = async (url) => {
   const response = await api.post('/admin?action=importar-imagen-url', { url });
   return response.data;
 };
+
+// =================== VERIFICAR ACCESO ADMIN ===================
+
+export const verificarAdmin = async () => {
+  const response = await api.get('/admin?action=me');
+  return response.data;
+};

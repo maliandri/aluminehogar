@@ -33,6 +33,15 @@ function authenticateAdmin(request) {
 export async function GET(request) {
   try {
     const decoded = authenticateAdmin(request);
+
+    // El panel pregunta acá si el token pertenece a un admin antes de mostrar nada (no toca la base)
+    if (request.nextUrl.searchParams.get('action') === 'me') {
+      return NextResponse.json({
+        ok: true,
+        usuario: { id: decoded.userId, email: decoded.email, role: decoded.role }
+      });
+    }
+
     await connectDB();
 
     const action = request.nextUrl.searchParams.get('action');
