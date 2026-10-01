@@ -6,6 +6,7 @@ import { Footer } from '@/components/Footer';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
 import { FacebookPixel } from '@/components/FacebookPixel';
 import ChatBot from '@/components/ChatBot';
+import { PublicChrome } from '@/components/PublicChrome';
 
 export const metadata = {
   metadataBase: new URL('https://aluminehogar.com.ar'),
@@ -72,11 +73,15 @@ export default function RootLayout({ children }) {
         <ClientProviders>
           <FacebookPixel />
           <div className="min-h-screen flex flex-col">
-            <Header />
+            <PublicChrome>
+              <Header />
+            </PublicChrome>
             <main className="flex-grow">{children}</main>
-            <Footer />
-            <WhatsAppButton />
-            <ChatBot />
+            <PublicChrome>
+              <Footer />
+              <WhatsAppButton />
+              <ChatBot />
+            </PublicChrome>
           </div>
         </ClientProviders>
 
