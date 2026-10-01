@@ -4,10 +4,12 @@ import { useCartStore } from '@/store/cartStore';
 import { trackInitiateCheckout, trackContact } from '@/utils/facebookPixel';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSite } from '@/components/SiteProvider';
 
 const MP_ALIAS = process.env.NEXT_PUBLIC_MP_ALIAS || 'alumine.hogar.mp';
 
 export const CartModal = ({ isOpen, onClose }) => {
+  const site = useSite();
   const router = useRouter();
   const cart = useCartStore((state) => state.cart);
   const updateQuantity = useCartStore((state) => state.updateQuantity);
@@ -28,7 +30,7 @@ export const CartModal = ({ isOpen, onClose }) => {
   const handleWhatsAppCheckout = () => {
     if (cartItems.length === 0) return;
 
-    const whatsappNumber = '5492995769999';
+    const whatsappNumber = site.tienda.whatsapp;
     let mensaje = `Hola! Quiero hacer un pedido:\n\n`;
 
     cartItems.forEach((item) => {

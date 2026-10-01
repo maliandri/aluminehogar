@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, MessageSquare, Loader2, User, MessageCircle, ArrowLeft, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import axios from 'axios';
+import { useSite } from '@/components/SiteProvider';
 
 const API_URL = '/api';
 
@@ -15,6 +16,7 @@ const SUGERENCIAS = [
 ];
 
 export default function BotPage() {
+  const site = useSite();
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -165,7 +167,7 @@ export default function BotPage() {
   };
 
   const handleWhatsAppClick = () => {
-    const whatsappNumber = '5492995769999';
+    const whatsappNumber = site.tienda.whatsapp;
     const conversationSummary = messages.slice(-3).map(m => `${m.role === 'user' ? 'Cliente' : 'Bot'}: ${m.content}`).join('\n');
     const message = encodeURIComponent(`Hola, necesito asistencia.\n\nResumen de conversacion:\n${conversationSummary}`);
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
@@ -182,7 +184,7 @@ export default function BotPage() {
   };
 
   const handleContactClick = () => {
-    const whatsappNumber = '5492995769999';
+    const whatsappNumber = site.tienda.whatsapp;
     const message = encodeURIComponent('Hola, estaba chateando con el bot y me gustaria mas informacion.');
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
   };

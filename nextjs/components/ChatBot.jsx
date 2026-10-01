@@ -3,10 +3,12 @@ import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { X, Send, MessageSquare, Minimize2, Loader2, User, MessageCircle } from 'lucide-react';
 import axios from 'axios';
+import { useSite } from '@/components/SiteProvider';
 
 const API_URL = '/api';
 
 export default function ChatBot() {
+  const site = useSite();
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -231,13 +233,13 @@ export default function ChatBot() {
   };
 
   const handleContactClick = () => {
-    const whatsappNumber = '5492995769999';
+    const whatsappNumber = site.tienda.whatsapp;
     const message = encodeURIComponent('Hola, estaba chateando con el bot y me gustaria mas informacion.');
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
   };
 
   const handleWhatsAppClick = () => {
-    const whatsappNumber = '5492995769999';
+    const whatsappNumber = site.tienda.whatsapp;
     const conversationSummary = messages.slice(-3).map(m => `${m.role === 'user' ? 'Cliente' : 'Bot'}: ${m.content}`).join('\n');
     const message = encodeURIComponent(`Hola, necesito asistencia.\n\nResumen de conversacion:\n${conversationSummary}`);
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');

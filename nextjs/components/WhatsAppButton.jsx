@@ -1,13 +1,15 @@
 'use client';
 import { MessageCircle } from 'lucide-react';
 import { trackContact } from '@/utils/facebookPixel';
+import { useSite } from '@/components/SiteProvider';
 
 /**
  * Boton flotante de WhatsApp
  * Aparece en la esquina inferior derecha de la pantalla
  */
 export const WhatsAppButton = () => {
-  const whatsappNumber = '5492995769999'; // +54 9 299 576-9999
+  const site = useSite();
+  const whatsappNumber = site.tienda.whatsapp;
   const mensaje = 'Hola! Me gustaria consultar sobre sus productos.';
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(mensaje)}`;
 

@@ -8,8 +8,11 @@ import { ProductCarouselView } from '@/components/ProductCarouselView';
 import { VendedorModal } from '@/components/VendedorModal';
 import { CategorySidebar } from '@/components/CategorySidebar';
 import { useUI } from '@/components/ClientProviders';
+import { useSite } from '@/components/SiteProvider';
+import { telHref } from '@/lib/site-format';
 
 export default function HomePageClient({ initialProductos, initialCategorias }) {
+  const site = useSite();
   const [productos] = useState(initialProductos || []);
   const [categorias] = useState(initialCategorias || []);
   const { showVendedorModal, setShowVendedorModal, showAuthModal, setShowAuthModal } = useUI();
@@ -67,10 +70,10 @@ export default function HomePageClient({ initialProductos, initialCategorias }) 
         <div className="gradient-overlay absolute inset-0" />
         <div className="relative z-10 container-custom px-4">
           <h1 className="text-4xl md:text-6xl font-bold mb-4 text-shadow animate-fadeIn">
-            Alumine con el calor del HOGAR!
+            {site.inicio.titulo}
           </h1>
           <p className="text-xl md:text-2xl mb-8 text-shadow animate-fadeIn">
-            Encuentra los mejores productos para tu descanso
+            {site.inicio.subtitulo}
           </p>
           <a href="#productos" className="btn-primary inline-block text-lg animate-fadeIn">
             Ver Productos
@@ -210,8 +213,8 @@ export default function HomePageClient({ initialProductos, initialCategorias }) 
             Nuestro equipo esta listo para ayudarte a encontrar el colchon perfecto para tu descanso.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="tel:+542995769999" className="btn-primary">Llamar Ahora</a>
-            <a href="mailto:info@aluminehogar.com.ar" className="btn-outline">Enviar Email</a>
+            <a href={telHref(site.tienda.telefono)} className="btn-primary">Llamar Ahora</a>
+            <a href={`mailto:${site.tienda.emailInfo || site.tienda.emailContacto}`} className="btn-outline">Enviar Email</a>
           </div>
         </div>
       </section>

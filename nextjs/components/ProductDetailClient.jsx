@@ -7,8 +7,10 @@ import { useCartStore } from '@/store/cartStore';
 import { CloudinaryImage } from '@/components/CloudinaryImage';
 import { trackViewContent, trackContact } from '@/utils/facebookPixel';
 import { useEffect } from 'react';
+import { useSite } from '@/components/SiteProvider';
 
 export default function ProductDetailClient({ producto }) {
+  const site = useSite();
   const [openSpecs, setOpenSpecs] = useState({});
   const addToCart = useCartStore((state) => state.addToCart);
 
@@ -43,7 +45,7 @@ export default function ProductDetailClient({ producto }) {
 
   const handleWhatsApp = () => {
     const mensaje = `Hola! Me interesa el producto: ${producto.nombre} - Precio: $${producto.precio.toLocaleString('es-AR')}`;
-    const whatsappUrl = `https://wa.me/5492995769999?text=${encodeURIComponent(mensaje)}`;
+    const whatsappUrl = `https://wa.me/${site.tienda.whatsapp}?text=${encodeURIComponent(mensaje)}`;
     trackContact('WhatsApp Product', producto.precio);
     window.open(whatsappUrl, '_blank');
   };
