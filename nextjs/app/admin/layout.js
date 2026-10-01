@@ -57,7 +57,7 @@ export default function AdminLayout({ children }) {
   };
 
   const sidebar = (
-    <nav className="flex flex-col h-full">
+    <nav aria-label="Menú del panel" className="flex flex-col h-full">
       <div className="px-5 py-5 border-b border-white/10">
         <div className="text-lg font-bold">Aluminé Hogar</div>
         <div className="text-xs text-white/60 uppercase tracking-wide">Sistema de gestión</div>
@@ -67,6 +67,8 @@ export default function AdminLayout({ children }) {
           <li key={s.id}>
             <Link
               href={s.items[0].ruta}
+              onClick={() => setMenuAbierto(false)}
+              aria-current={s.id === idActiva ? 'page' : undefined}
               className={`flex items-center gap-3 mx-3 my-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 s.id === idActiva ? 'bg-blue-600 text-white' : 'text-white/80 hover:bg-white/10'
               }`}
@@ -80,7 +82,7 @@ export default function AdminLayout({ children }) {
       <div className="px-5 py-4 border-t border-white/10 text-sm">
         <div className="font-medium truncate">{usuario.email}</div>
         <div className="text-xs text-white/60 mb-3">Administrador</div>
-        <Link href="/" className="flex items-center gap-2 text-white/80 hover:text-white mb-2">
+        <Link href="/" onClick={() => setMenuAbierto(false)} className="flex items-center gap-2 text-white/80 hover:text-white mb-2">
           <ExternalLink className="w-4 h-4" /> Ver tienda
         </Link>
         <button type="button" onClick={handleLogout} className="flex items-center gap-2 text-white/80 hover:text-white">
@@ -113,13 +115,14 @@ export default function AdminLayout({ children }) {
 
       <div className="flex-1 min-w-0">
         {activa && (
-          <div className="bg-white border-b px-6 flex gap-1 overflow-x-auto">
+          <nav aria-label="Pestañas de la sección" className="bg-white border-b px-6 flex gap-1 overflow-x-auto">
             {activa.items.map((it) => {
               const actual = pathname === it.ruta || pathname.startsWith(it.ruta + '/');
               return (
                 <Link
                   key={it.id}
                   href={it.ruta}
+                  aria-current={actual ? 'page' : undefined}
                   className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
                     actual ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'
                   }`}
@@ -129,9 +132,9 @@ export default function AdminLayout({ children }) {
                 </Link>
               );
             })}
-          </div>
+          </nav>
         )}
-        <main className="p-6">{children}</main>
+        <div className="p-6">{children}</div>
       </div>
     </div>
   );
