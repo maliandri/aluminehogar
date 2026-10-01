@@ -3,6 +3,7 @@ import { generateAIResponse } from '@/lib/gemini';
 import { searchProducts } from '@/lib/product-search';
 import { enviarEmail } from '@/lib/email';
 import { connectDB } from '@/lib/db';
+import { getSiteConfig } from '@/lib/site-config';
 import Conversation from '@/lib/models/Conversation';
 
 export async function POST(request) {
@@ -74,7 +75,7 @@ export async function POST(request) {
       });
 
       await enviarEmail({
-        destinatario: process.env.ADMIN_EMAIL || 'aluminehogar@gmail.com',
+        destinatario: process.env.ADMIN_EMAIL || (await getSiteConfig()).tienda.emailNotificaciones,
         asunto: `Nuevo Lead: ${leadData.nombre || leadData.email}`,
         cuerpoHtml: `
           <h2>Nuevo Lead Capturado</h2>

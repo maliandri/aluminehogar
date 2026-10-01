@@ -4,6 +4,7 @@ import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
 import { generateToken, comparePassword } from '@/lib/auth-helpers';
 import { enviarEmail, emailBienvenida, emailRecupero } from '@/lib/email';
+import { getSiteConfig } from '@/lib/site-config';
 
 export async function POST(request) {
   try {
@@ -84,7 +85,7 @@ export async function POST(request) {
       enviarEmail({
         destinatario: email,
         asunto: 'Bienvenido/a a Alumine Hogar!',
-        cuerpoHtml: emailBienvenida(nombre)
+        cuerpoHtml: emailBienvenida(nombre, (await getSiteConfig()).tienda)
       }).catch(err => console.error('Error al enviar email de bienvenida:', err));
 
       return NextResponse.json({
@@ -114,7 +115,7 @@ export async function POST(request) {
           await enviarEmail({
             destinatario: email,
             asunto: 'Codigo de recupero - Alumine Hogar',
-            cuerpoHtml: emailRecupero(code)
+            cuerpoHtml: emailRecupero(code, (await getSiteConfig()).tienda)
           });
           console.log('Email de recupero enviado a:', email);
         } catch (emailErr) {

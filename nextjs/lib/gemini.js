@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getSiteConfig } from '@/lib/site-config';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = 'gemini-2.5-flash-lite';
@@ -20,7 +21,8 @@ export async function generateAIResponse(userMessage, productContext = [], conve
       }
     });
 
-    const systemPrompt = buildSystemPrompt(productContext);
+    const site = await getSiteConfig();
+    const systemPrompt = buildSystemPrompt(productContext, site);
 
     const history = [
       {
@@ -48,8 +50,10 @@ export async function generateAIResponse(userMessage, productContext = [], conve
   }
 }
 
-function buildSystemPrompt(productContext) {
-  let prompt = `Eres un asistente virtual de ventas para "Alumine Hogar", tu tienda de confianza para el hogar en Neuquen, Argentina.
+function buildSystemPrompt(productContext, site) {
+  const t = site.tienda;
+  const c = site.chatbot;
+  let prompt = `Eres un asistente virtual de ventas para "${t.nombre}", tu tienda de confianza para el hogar en ${t.ciudad}, Argentina.
 
 **NUESTRO SLOGAN:** "Calidad para tu hogar, precios para vos"
 
@@ -67,19 +71,16 @@ function buildSystemPrompt(productContext) {
 5. Ser honesto si no sabes algo
 
 **INFORMACION DE LA EMPRESA:**
-- Nombre: Alumine Hogar
-- Ubicacion: Neuquen Capital, Argentina
-- WhatsApp: +54 9 299 576-9999
+- Nombre: ${t.nombre}
+- Ubicacion: ${[t.direccion, t.ciudad].filter(Boolean).join(', ')}, Argentina
+- WhatsApp: ${t.telefono}
 - Sitio web: https://aluminehogar.com.ar
 - Envios: A todo el pais
-- Envio GRATIS en Neuquen Capital
-- Formas de pago: Efectivo, transferencia, tarjetas (consultar cuotas)
+- ${c.envio}
+- Formas de pago: ${c.formasDePago}
 
 **POLITICAS:**
-- Garantia de 5 anos en colchones premium
-- Garantia de 3 anos en colchones estandar
-- Garantia de 1 ano en almohadas
-- Cambios y devoluciones dentro de los 30 dias
+${c.politicas.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => `- ${l}`).join('\n')}
 `;
 
   if (productContext && productContext.length > 0) {

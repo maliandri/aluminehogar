@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { getSiteConfig } from '@/lib/site-config';
 
 let _resend = null;
 function getResend() {
@@ -6,7 +7,14 @@ function getResend() {
   return _resend;
 }
 
-export function emailBienvenida(nombre) {
+// Pie común de las plantillas: nombre, ciudad y contacto de la tienda
+function pieEmail(t) {
+  return `
+        <p style="margin: 0;">${t.nombre} - ${t.ciudad}, Argentina</p>
+        <p style="margin: 5px 0 0;">${t.telefono} | ${t.emailContacto}</p>`;
+}
+
+export function emailBienvenida(nombre, t) {
   return `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
       <div style="background: linear-gradient(135deg, #2d5016 0%, #4a7c25 100%); padding: 30px; text-align: center;">
@@ -29,14 +37,13 @@ export function emailBienvenida(nombre) {
         </div>
       </div>
       <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #888;">
-        <p style="margin: 0;">Alumine Hogar - Neuquen, Argentina</p>
-        <p style="margin: 5px 0 0;">+54 9 299 576-9999 | aluminehogar@gmail.com</p>
+        ${pieEmail(t)}
       </div>
     </div>
   `;
 }
 
-export function emailRecupero(codigo) {
+export function emailRecupero(codigo, t) {
   return `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
       <div style="background: linear-gradient(135deg, #2d5016 0%, #4a7c25 100%); padding: 30px; text-align: center;">
@@ -55,8 +62,7 @@ export function emailRecupero(codigo) {
         </div>
       </div>
       <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #888;">
-        <p style="margin: 0;">Alumine Hogar - Neuquen, Argentina</p>
-        <p style="margin: 5px 0 0;">+54 9 299 576-9999 | aluminehogar@gmail.com</p>
+        ${pieEmail(t)}
       </div>
     </div>
   `;
@@ -65,6 +71,7 @@ export function emailRecupero(codigo) {
 export async function sendPromotionEmail(email, nombre, role) {
   const rolesLabels = { vendedor: 'Vendedor', admin: 'Administrador' };
   const label = rolesLabels[role] || role;
+  const { tienda: t } = await getSiteConfig();
 
   const html = `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
@@ -83,8 +90,7 @@ export async function sendPromotionEmail(email, nombre, role) {
         </div>
       </div>
       <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #888;">
-        <p style="margin: 0;">Alumine Hogar - Neuquen, Argentina</p>
-        <p style="margin: 5px 0 0;">+54 9 299 576-9999 | aluminehogar@gmail.com</p>
+        ${pieEmail(t)}
       </div>
     </div>
   `;
@@ -96,7 +102,7 @@ export async function sendPromotionEmail(email, nombre, role) {
   });
 }
 
-export function emailInvitacion(role, linkInvitacion) {
+export function emailInvitacion(role, linkInvitacion, t) {
   const rolesLabels = { customer: 'Cliente', vendedor: 'Vendedor', admin: 'Administrador' };
   const label = rolesLabels[role] || role;
 
@@ -116,8 +122,7 @@ export function emailInvitacion(role, linkInvitacion) {
         <p style="color: #888; font-size: 13px; text-align: center;">Este enlace vence en 7 dias.</p>
       </div>
       <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #888;">
-        <p style="margin: 0;">Alumine Hogar - Neuquen, Argentina</p>
-        <p style="margin: 5px 0 0;">+54 9 299 576-9999 | aluminehogar@gmail.com</p>
+        ${pieEmail(t)}
       </div>
     </div>
   `;

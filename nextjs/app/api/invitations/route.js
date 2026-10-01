@@ -5,6 +5,7 @@ import User from '@/lib/models/User';
 import Invitation from '@/lib/models/Invitation';
 import { extractTokenFromHeaders, verifyToken, requireRole, generateToken } from '@/lib/auth-helpers';
 import { enviarEmail, emailInvitacion } from '@/lib/email';
+import { getSiteConfig } from '@/lib/site-config';
 
 const ROLES_INVITABLES = ['customer', 'vendedor', 'admin'];
 const INVITATION_TTL_DIAS = 7;
@@ -131,7 +132,7 @@ export async function POST(request) {
       enviarEmail({
         destinatario: emailLower,
         asunto: 'Invitacion a Alumine Hogar',
-        cuerpoHtml: emailInvitacion(role, linkInvitacion)
+        cuerpoHtml: emailInvitacion(role, linkInvitacion, (await getSiteConfig()).tienda)
       }).catch(err => console.error('Error al enviar email de invitacion:', err));
 
       return NextResponse.json({

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { connectDB } from '@/lib/db';
+import { getSiteConfig } from '@/lib/site-config';
 import Order from '@/lib/models/Order';
 import PaymentSettings from '@/lib/models/PaymentSettings';
 import MedioPago from '@/lib/models/MedioPago';
@@ -172,7 +173,7 @@ export async function POST(request) {
             });
 
             await enviarEmail({
-              destinatario: process.env.ADMIN_EMAIL || 'aluminehogar@gmail.com',
+              destinatario: process.env.ADMIN_EMAIL || (await getSiteConfig()).tienda.emailNotificaciones,
               asunto: `Nueva venta - ${paymentData.external_reference}`,
               cuerpoHtml: `
                 <h2>Nueva venta confirmada</h2>
