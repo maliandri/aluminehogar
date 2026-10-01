@@ -408,3 +408,15 @@ export const verificarAdmin = async () => {
   const response = await api.get('/admin?action=me');
   return response.data;
 };
+
+// =================== CONFIGURACION DEL SITIO ===================
+
+export const obtenerSiteConfig = async () => {
+  const response = await api.get('/site-config');
+  return response.data;
+};
+
+export const guardarSiteConfig = async (config) => {
+  const response = await api.put('/site-config', config);
+  return response.data;
+};

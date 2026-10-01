@@ -19,6 +19,7 @@ export const ITEMS = [
   { id: 'promociones', seccion: 'marketing', etiqueta: 'Promociones', icono: 'Sparkles', ruta: '/admin/marketing/promociones', roles: ['admin'] },
   { id: 'medios-pago', seccion: 'marketing', etiqueta: 'Medios de pago', icono: 'Wallet', ruta: '/admin/marketing/medios-pago', roles: ['admin'] },
   { id: 'usuarios', seccion: 'configuracion', etiqueta: 'Usuarios', icono: 'Users', ruta: '/admin/configuracion/usuarios', roles: ['admin'] },
+  { id: 'config-sitio', seccion: 'configuracion', etiqueta: 'Configuración del sitio', icono: 'Settings', ruta: '/admin/configuracion/sitio', roles: ['admin'] },
 ];
 
 // true solo para /admin y /admin/...; no para rutas que apenas empiezan igual (/administrador)
