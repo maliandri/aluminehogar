@@ -389,3 +389,15 @@ export const importarPresupuesto = async (items, depositoId) => {
   const response = await api.post('/admin?action=presupuesto-import', { items, depositoId: depositoId || null });
   return response.data;
 };
+
+// =================== BUSCAR IMAGENES ===================
+
+export const buscarImagenesProducto = async (consulta) => {
+  const response = await api.post('/admin?action=buscar-imagenes', { consulta });
+  return response.data;
+};
+
+export const importarImagenUrl = async (url) => {
+  const response = await api.post('/admin?action=importar-imagen-url', { url });
+  return response.data;
+};

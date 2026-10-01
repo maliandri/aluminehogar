@@ -10,6 +10,7 @@ import { getCloudinaryUrl, IMG_THUMB, IMG_CARD } from '@/lib/cloudinary';
 import { MAPEO_NOMBRES_CLOUDINARY } from '@/lib/cloudinary-mapeo-nombres';
 import { generarEspecificaciones, generarDescripcion } from '@/lib/gemini';
 import { leerPresupuestoPdf, sugerirClasificacion } from '@/lib/presupuesto-pdf';
+import { buscarImagenes } from '@/lib/buscar-imagenes';
 import * as xlsx from 'xlsx';
 
 cloudinary.config({
@@ -203,6 +204,53 @@ export async function POST(request) {
       }
 
       return NextResponse.json({ success: true, actualizados, errores, total: rows.length });
+    }
+
+    // BUSCAR IMAGENES DE PRODUCTO (SerpAPI / Google Imagenes): solo devuelve candidatos
+    if (action === 'buscar-imagenes') {
+      const { consulta } = await request.json();
+      const q = String(consulta || '').trim().slice(0, 200);
+      if (q.length < 3) {
+        return NextResponse.json({ error: 'Escribi al menos 3 caracteres' }, { status: 400 });
+      }
+      try {
+        const resultados = await buscarImagenes(q);
+        return NextResponse.json({ success: true, resultados });
+      } catch (e) {
+        console.error('Error buscando imagenes:', e.message);
+        return NextResponse.json({
+          error: e.status === 503 ? 'La busqueda de imagenes no esta configurada' : 'No se pudo buscar imagenes',
+          details: e.message
+        }, { status: e.status || 500 });
+      }
+    }
+
+    // IMPORTAR IMAGEN ELEGIDA POR URL: Cloudinary la descarga y la deja optimizada
+    if (action === 'importar-imagen-url') {
+      const { url } = await request.json();
+      let parsed;
+      try { parsed = new URL(String(url || '')); } catch { parsed = null; }
+      if (!parsed || parsed.protocol !== 'https:') {
+        return NextResponse.json({ error: 'URL de imagen invalida' }, { status: 400 });
+      }
+
+      try {
+        const result = await cloudinary.uploader.upload(parsed.href, {
+          folder: 'alumiweb',
+          resource_type: 'image',
+          transformation: [
+            { width: 800, height: 800, crop: 'limit' },
+            { quality: 'auto', fetch_format: 'auto' }
+          ]
+        });
+        const optimizedUrl = cloudinary.url(result.public_id, {
+          width: 400, height: 400, crop: 'limit', quality: 'auto', fetch_format: 'auto'
+        });
+        return NextResponse.json({ success: true, url: result.secure_url, optimizedUrl, publicId: result.public_id });
+      } catch (e) {
+        console.error('Error importando imagen:', e.message || e);
+        return NextResponse.json({ error: 'No se pudo descargar esa imagen. Probá con otra.' }, { status: 422 });
+      }
     }
 
     // READ SUPPLIER QUOTE PDF (no escribe nada: devuelve filas + sugerencias para que el admin revise)

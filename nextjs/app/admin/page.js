@@ -42,6 +42,8 @@ import {
   eliminarPromocion,
   leerPresupuestoPdf,
   importarPresupuesto,
+  buscarImagenesProducto,
+  importarImagenUrl,
 } from '@/services/api';
 
 export default function AdminPanel() {
@@ -1750,6 +1752,7 @@ function ProductForm({ producto, categorias, onClose, onSuccess }) {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generatingIA, setGeneratingIA] = useState(false);
+  const [buscandoImagen, setBuscandoImagen] = useState(false);
 
   const handleGenerarIA = async () => {
     if (!formData.nombre) {
@@ -1841,6 +1844,13 @@ function ProductForm({ producto, categorias, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      {buscandoImagen && (
+        <BuscarImagenModal
+          consultaInicial={[formData.marca, formData.nombre].filter(Boolean).join(' ')}
+          onClose={() => setBuscandoImagen(false)}
+          onElegida={(r) => { setFormData(prev => ({ ...prev, imagen: r.url, imagenOptimizada: r.optimizedUrl })); setBuscandoImagen(false); }}
+        />
+      )}
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-screen overflow-y-auto">
         <div className="p-6">
           <h2 className="text-2xl font-bold mb-4">{producto ? 'Editar Producto' : 'Crear Producto'}</h2>
@@ -1877,6 +1887,10 @@ function ProductForm({ producto, categorias, onClose, onSuccess }) {
                       <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
                     </div>
                   )}
+                  <button type="button" onClick={() => setBuscandoImagen(true)} disabled={uploading}
+                    className="w-full flex items-center gap-2 px-4 py-2 rounded text-sm font-medium bg-purple-50 text-purple-700 hover:bg-purple-100 disabled:opacity-50">
+                    <Search className="w-4 h-4" /> Buscar imagen
+                  </button>
                   <p className="text-xs text-gray-500">JPG, PNG o WebP. Max 10MB.</p>
                   {imagenPreview && (
                     <button type="button" onClick={() => setFormData(prev => ({ ...prev, imagen: '', imagenOptimizada: '' }))}
@@ -2177,6 +2191,81 @@ function PresupuestoPanel() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// =================== BUSCADOR DE IMAGENES ===================
+
+function BuscarImagenModal({ consultaInicial, onClose, onElegida }) {
+  const [consulta, setConsulta] = useState(consultaInicial);
+  const [buscando, setBuscando] = useState(false);
+  const [importando, setImportando] = useState(null);
+  const [resultados, setResultados] = useState(null);
+
+  const buscar = async (e) => {
+    e?.preventDefault();
+    if (consulta.trim().length < 3) return;
+    setBuscando(true);
+    try {
+      const data = await buscarImagenesProducto(consulta.trim());
+      setResultados(data.resultados);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al buscar imagenes');
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const elegir = async (r) => {
+    setImportando(r.url);
+    try {
+      const data = await importarImagenUrl(r.url);
+      onElegida(data);
+    } catch (err) {
+      alert(err.response?.data?.error || 'No se pudo usar esa imagen');
+      setImportando(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="text-lg font-semibold">Buscar imagen del producto</h3>
+          <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-700"><X className="w-5 h-5" /></button>
+        </div>
+        <form onSubmit={buscar} className="flex gap-2 p-4 border-b">
+          <input type="text" value={consulta} onChange={(e) => setConsulta(e.target.value)}
+            className="flex-1 border rounded px-3 py-2 text-sm" placeholder="Marca y modelo del producto" />
+          <button type="submit" disabled={buscando} className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2">
+            {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Buscar
+          </button>
+        </form>
+        <div className="p-4 overflow-y-auto">
+          <p className="text-xs text-gray-500 mb-3">
+            Las imágenes pertenecen a sus sitios de origen. Preferí las del fabricante o proveedor y revisá que tengas derecho a usarlas.
+          </p>
+          {resultados && resultados.length === 0 && <div className="text-center py-8 text-gray-500">Sin resultados. Probá con otra búsqueda.</div>}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {(resultados || []).map((r) => (
+              <button key={r.url} type="button" disabled={!!importando} onClick={() => elegir(r)}
+                className="border rounded-lg overflow-hidden text-left hover:ring-2 hover:ring-blue-500 disabled:opacity-60 relative bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={r.miniatura} alt={r.titulo} className="w-full h-32 object-contain bg-gray-50" />
+                <div className="p-2">
+                  <div className="text-xs font-medium truncate">{r.fuente || 'Sitio desconocido'}</div>
+                  <div className="text-[11px] text-gray-500">{r.ancho && r.alto ? `${r.ancho}×${r.alto}` : ''}</div>
+                </div>
+                {importando === r.url && (
+                  <div className="absolute inset-0 bg-white/70 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin" /></div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
