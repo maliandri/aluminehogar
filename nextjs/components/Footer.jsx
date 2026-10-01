@@ -15,7 +15,7 @@ export const Footer = () => {
               Calidad para tu hogar, precios para vos. Todo lo que necesitas para tu hogar en Neuquen.
             </p>
             <img
-              src="https://res.cloudinary.com/dlshym1te/image/upload/f_png,fl_preserve_transparency,q_auto/Alumine%CC%81_Hogar-logo"
+              src="https://res.cloudinary.com/va9k9n0n/image/upload/f_png,fl_preserve_transparency,q_auto/Alumine%CC%81_Hogar-logo"
               alt="Alumine Hogar"
               className="h-12 w-auto opacity-80"
               onError={(e) => {

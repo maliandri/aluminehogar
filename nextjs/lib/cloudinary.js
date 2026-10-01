@@ -1,7 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dlshym1te',
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'va9k9n0n',
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
@@ -22,7 +22,7 @@ export function getCloudinaryUrl(publicIdOrUrl, transformation) {
     return publicIdOrUrl;
   }
 
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'dlshym1te';
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'va9k9n0n';
   return `https://res.cloudinary.com/${cloudName}/image/upload/${transformation}/${publicIdOrUrl}`;
 }
 

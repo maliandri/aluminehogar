@@ -23,7 +23,7 @@ export const metadata = {
     siteName: 'Alumine Hogar',
     title: 'Alumine Hogar | Tu Mejor Descanso en Neuquen',
     description: 'Descubri la mejor seleccion de colchones y almohadas en Neuquen. Envios a todo el pais. Calidad, confort y los mejores precios.',
-    images: ['https://res.cloudinary.com/dlshym1te/image/upload/f_auto,q_auto/Alumine%CC%81_Hogar-logo'],
+    images: ['https://res.cloudinary.com/va9k9n0n/image/upload/f_auto,q_auto/Alumine%CC%81_Hogar-logo'],
   },
   twitter: {
     card: 'summary_large_image',
@@ -33,8 +33,8 @@ export const metadata = {
   },
   robots: { index: true, follow: true },
   icons: {
-    icon: 'https://res.cloudinary.com/dlshym1te/image/upload/f_auto,q_auto/Alumine%CC%81_Hogar-logo',
-    apple: 'https://res.cloudinary.com/dlshym1te/image/upload/f_auto,q_auto/Alumine%CC%81_Hogar-logo',
+    icon: 'https://res.cloudinary.com/va9k9n0n/image/upload/f_auto,q_auto/Alumine%CC%81_Hogar-logo',
+    apple: 'https://res.cloudinary.com/va9k9n0n/image/upload/f_auto,q_auto/Alumine%CC%81_Hogar-logo',
   },
 };
 
@@ -55,7 +55,7 @@ export default function RootLayout({ children }) {
               "name": "Alumine Hogar",
               "description": "Tienda especializada en colchones y almohadas premium en Neuquen",
               "url": "https://aluminehogar.com.ar/",
-              "logo": "https://res.cloudinary.com/dlshym1te/image/upload/f_auto,q_auto/Alumine%CC%81_Hogar-logo",
+              "logo": "https://res.cloudinary.com/va9k9n0n/image/upload/f_auto,q_auto/Alumine%CC%81_Hogar-logo",
               "address": {
                 "@type": "PostalAddress",
                 "addressLocality": "Neuquen",
