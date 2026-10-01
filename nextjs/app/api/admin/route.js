@@ -3,11 +3,13 @@ import { connectDB } from '@/lib/db';
 import Product from '@/lib/models/Product';
 import User from '@/lib/models/User';
 import Conversation from '@/lib/models/Conversation';
+import Deposito from '@/lib/models/Deposito';
 import { extractTokenFromHeaders, verifyToken, requireAdmin } from '@/lib/auth-helpers';
 import { v2 as cloudinary } from 'cloudinary';
 import { getCloudinaryUrl, IMG_THUMB, IMG_CARD } from '@/lib/cloudinary';
 import { MAPEO_NOMBRES_CLOUDINARY } from '@/lib/cloudinary-mapeo-nombres';
 import { generarEspecificaciones, generarDescripcion } from '@/lib/gemini';
+import { leerPresupuestoPdf, sugerirClasificacion } from '@/lib/presupuesto-pdf';
 import * as xlsx from 'xlsx';
 
 cloudinary.config({
@@ -15,6 +17,9 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
+
+// La lectura de PDF + sugerencias de Gemini (con reintentos) puede tardar más de 10 s
+export const maxDuration = 60;
 
 function authenticateAdmin(request) {
   const token = extractTokenFromHeaders(request.headers);
@@ -198,6 +203,110 @@ export async function POST(request) {
       }
 
       return NextResponse.json({ success: true, actualizados, errores, total: rows.length });
+    }
+
+    // READ SUPPLIER QUOTE PDF (no escribe nada: devuelve filas + sugerencias para que el admin revise)
+    if (action === 'presupuesto-parse') {
+      const { pdfBase64 } = await request.json();
+      if (!pdfBase64) {
+        return NextResponse.json({ error: 'Archivo requerido' }, { status: 400 });
+      }
+
+      const buffer = Buffer.from(pdfBase64.split(',')[1] || pdfBase64, 'base64');
+      if (buffer.subarray(0, 4).toString() !== '%PDF') {
+        return NextResponse.json({ error: 'El archivo no es un PDF' }, { status: 400 });
+      }
+
+      let lectura;
+      try {
+        lectura = await leerPresupuestoPdf(buffer);
+      } catch (e) {
+        console.error('Error leyendo PDF:', e);
+        return NextResponse.json({ error: 'No se pudo leer el PDF' }, { status: 422 });
+      }
+      if (!lectura.filas.length) {
+        return NextResponse.json({ error: 'No se encontraron productos en el PDF' }, { status: 422 });
+      }
+
+      await connectDB();
+      const collection = Product.db.collection('productos');
+      const [categorias, marcas, existentes] = await Promise.all([
+        collection.distinct('categoria'),
+        collection.distinct('marca'),
+        collection.find({ _id: { $in: lectura.filas.map((f) => f.codigo) } }, { projection: { nombre: 1, precio: 1 } }).toArray()
+      ]);
+      const existentesPorId = Object.fromEntries(existentes.map((p) => [String(p._id), p]));
+      const sugerencias = await sugerirClasificacion(lectura.filas, categorias.filter(Boolean), marcas.filter(Boolean));
+
+      return NextResponse.json({
+        success: true,
+        ...lectura,
+        categorias: categorias.filter(Boolean).sort(),
+        filas: lectura.filas.map((f) => ({
+          ...f,
+          categoria: sugerencias[f.codigo]?.categoria || '',
+          marca: sugerencias[f.codigo]?.marca || '',
+          existente: existentesPorId[f.codigo]
+            ? { nombre: existentesPorId[f.codigo].nombre, precio: existentesPorId[f.codigo].precio }
+            : null
+        }))
+      });
+    }
+
+    // IMPORT APPROVED QUOTE ROWS: crea productos NO publicados (mostrar: 'no'); nunca pisa uno existente
+    if (action === 'presupuesto-import') {
+      const { items, depositoId } = await request.json();
+      if (!Array.isArray(items) || !items.length || items.length > 500) {
+        return NextResponse.json({ error: 'Lista de productos invalida' }, { status: 400 });
+      }
+
+      await connectDB();
+      const deposito = depositoId ? await Deposito.findById(depositoId).lean() : null;
+      if (depositoId && !deposito) {
+        return NextResponse.json({ error: 'Deposito inexistente' }, { status: 400 });
+      }
+
+      const errores = [];
+      const ops = [];
+      for (const it of items) {
+        const codigo = String(it.codigo || '').trim();
+        const nombre = String(it.nombre || '').trim();
+        const categoria = String(it.categoria || '').trim();
+        const precio = Number(it.precio);
+        const unidades = Math.max(0, parseInt(it.unidades) || 0);
+        if (!codigo || !nombre || !categoria || !(precio > 0)) {
+          errores.push(`${codigo || '(sin codigo)'}: faltan nombre, categoria o precio valido`);
+          continue;
+        }
+        ops.push({
+          updateOne: {
+            filter: { _id: codigo },
+            update: {
+              $setOnInsert: {
+                _id: codigo,
+                nombre,
+                descripcion: '',
+                precio,
+                categoria,
+                marca: String(it.marca || '').trim(),
+                imagen: '',
+                mostrar: 'no',
+                stock: unidades,
+                stockPorDeposito: deposito && unidades > 0 ? [{ depositoId: String(deposito._id), cantidad: unidades }] : [],
+                createdAt: new Date()
+              }
+            },
+            upsert: true
+          }
+        });
+      }
+
+      let creados = 0;
+      if (ops.length) {
+        const result = await Product.db.collection('productos').bulkWrite(ops, { ordered: false });
+        creados = result.upsertedCount;
+      }
+      return NextResponse.json({ success: true, creados, yaExistian: ops.length - creados, errores });
     }
 
     // UPLOAD IMAGE

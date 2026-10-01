@@ -372,3 +372,15 @@ export const crearPreferenciaPago = async (items, payer, shippingAddress, medioP
 };
 
 export default api;
+
+// =================== IMPORTAR PRESUPUESTO PDF ===================
+
+export const leerPresupuestoPdf = async (pdfBase64) => {
+  const response = await api.post('/admin?action=presupuesto-parse', { pdfBase64 });
+  return response.data;
+};
+
+export const importarPresupuesto = async (items, depositoId) => {
+  const response = await api.post('/admin?action=presupuesto-import', { items, depositoId: depositoId || null });
+  return response.data;
+};
