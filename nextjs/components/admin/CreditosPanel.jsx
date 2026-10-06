@@ -9,6 +9,8 @@ import {
   getPaymentSettings,
   actualizarPaymentSettings,
 } from '@/services/api';
+import { useAdminSession } from '@/components/admin/AdminSession';
+import { puedeEditar } from '@/lib/permisos';
 
 const ESTADO_CREDITO_LABELS = {
   activo: 'Activo',
@@ -18,6 +20,8 @@ const ESTADO_CREDITO_LABELS = {
 };
 
 export default function CreditosPanel() {
+  const { role } = useAdminSession();
+  const puedeEditarCreditos = puedeEditar(role, 'creditos');
   const [creditos, setCreditos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState(null);
@@ -78,6 +82,7 @@ export default function CreditosPanel() {
 
   return (
     <div className="space-y-6">
+      {puedeEditarCreditos && (
       <div className="bg-white shadow rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4">Configuracion de pagos</h3>
         <form onSubmit={handleGuardarSettings} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -110,6 +115,7 @@ export default function CreditosPanel() {
           cantidad de cuotas mayor, el credito queda pendiente de tu aprobacion abajo.
         </p>
       </div>
+      )}
 
       {pendientes.length > 0 && (
         <div className="bg-white shadow rounded-lg p-6">
@@ -123,6 +129,7 @@ export default function CreditosPanel() {
                     Total ${c.montoTotal.toLocaleString('es-AR')} — Anticipo ${c.anticipo.toLocaleString('es-AR')} — {c.cantidadCuotas} cuotas
                   </p>
                 </div>
+                {puedeEditarCreditos && (
                 <div className="flex gap-2">
                   <button onClick={() => handleAprobar(c._id)} className="flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded text-sm hover:bg-green-700">
                     <Check className="w-4 h-4" /> Aprobar
@@ -131,6 +138,7 @@ export default function CreditosPanel() {
                     <X className="w-4 h-4" /> Rechazar
                   </button>
                 </div>
+                )}
               </div>
             ))}
           </div>

@@ -7,8 +7,12 @@ import {
   actualizarDeposito,
   eliminarDeposito,
 } from '@/services/api';
+import { useAdminSession } from '@/components/admin/AdminSession';
+import { puedeEditar } from '@/lib/permisos';
 
 export default function DepositosPanel() {
+  const { role } = useAdminSession();
+  const puedeEditarDepositos = puedeEditar(role, 'depositos');
   const [depositos, setDepositos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ codigo: '', nombre: '', esVirtualVendedor: false });
@@ -66,6 +70,7 @@ export default function DepositosPanel() {
 
   return (
     <div className="space-y-6">
+      {puedeEditarDepositos && (
       <div className="bg-white shadow rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4">Nuevo deposito</h3>
         <form onSubmit={handleCrear} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
@@ -89,6 +94,7 @@ export default function DepositosPanel() {
           </button>
         </form>
       </div>
+      )}
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <table className="min-w-full">
@@ -109,10 +115,12 @@ export default function DepositosPanel() {
                 <td className="px-4 py-3 text-sm">{d.esVirtualVendedor ? 'Si' : 'No'}</td>
                 <td className="px-4 py-3 text-sm">{d.activo ? 'Activo' : 'Inactivo'}</td>
                 <td className="px-4 py-3 text-right text-sm space-x-2">
+                  {puedeEditarDepositos && (<>
                   <button onClick={() => handleToggleActivo(d)} className="text-blue-600 hover:underline">
                     {d.activo ? 'Desactivar' : 'Activar'}
                   </button>
                   <button onClick={() => handleEliminar(d._id)} className="text-red-600 hover:underline">Eliminar</button>
+                  </>)}
                 </td>
               </tr>
             ))}

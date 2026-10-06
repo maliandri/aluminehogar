@@ -11,6 +11,7 @@ import {
 import { useAuthStore } from '@/store/authStore';
 import { verificarAdmin } from '@/services/api';
 import { seccionesVisibles, seccionDeRuta } from '@/lib/admin-menu';
+import { AdminSessionProvider } from '@/components/admin/AdminSession';
 
 // El menú guarda los íconos por nombre (para poder editarlo desde la base en el proyecto B); acá se resuelven
 const ICONOS = { ShoppingCart, Store, Megaphone, Settings, CreditCard, MessageSquare, Package, Warehouse, FileUp, Sparkles, Wallet, Users };
@@ -81,7 +82,7 @@ export default function AdminLayout({ children }) {
       </ul>
       <div className="px-5 py-4 border-t border-white/10 text-sm">
         <div className="font-medium truncate">{usuario.email}</div>
-        <div className="text-xs text-white/60 mb-3">Administrador</div>
+        <div className="text-xs text-white/60 mb-3">{usuario.role === 'vendedor' ? 'Vendedor' : 'Administrador'}</div>
         <Link href="/" onClick={() => setMenuAbierto(false)} className="flex items-center gap-2 text-white/80 hover:text-white mb-2">
           <ExternalLink className="w-4 h-4" /> Ver tienda
         </Link>
@@ -134,7 +135,7 @@ export default function AdminLayout({ children }) {
             })}
           </nav>
         )}
-        <div className="p-6">{children}</div>
+        <div className="p-6"><AdminSessionProvider value={usuario}>{children}</AdminSessionProvider></div>
       </div>
     </div>
   );

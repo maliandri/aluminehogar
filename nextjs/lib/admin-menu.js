@@ -11,10 +11,10 @@ export const SECCIONES = [
 ];
 
 export const ITEMS = [
-  { id: 'creditos', seccion: 'ventas', etiqueta: 'Créditos', icono: 'CreditCard', ruta: '/admin/ventas/creditos', roles: ['admin'] },
+  { id: 'creditos', seccion: 'ventas', etiqueta: 'Créditos', icono: 'CreditCard', ruta: '/admin/ventas/creditos', roles: ['admin', 'vendedor'] },
   { id: 'conversaciones', seccion: 'ventas', etiqueta: 'Conversaciones', icono: 'MessageSquare', ruta: '/admin/ventas/conversaciones', roles: ['admin'] },
-  { id: 'productos', seccion: 'store', etiqueta: 'Productos', icono: 'Package', ruta: '/admin/store/productos', roles: ['admin'] },
-  { id: 'depositos', seccion: 'store', etiqueta: 'Depósitos', icono: 'Warehouse', ruta: '/admin/store/depositos', roles: ['admin'] },
+  { id: 'productos', seccion: 'store', etiqueta: 'Productos', icono: 'Package', ruta: '/admin/store/productos', roles: ['admin', 'vendedor'] },
+  { id: 'depositos', seccion: 'store', etiqueta: 'Depósitos', icono: 'Warehouse', ruta: '/admin/store/depositos', roles: ['admin', 'vendedor'] },
   { id: 'importar-pdf', seccion: 'store', etiqueta: 'Importar PDF', icono: 'FileUp', ruta: '/admin/store/importar-pdf', roles: ['admin'] },
   { id: 'promociones', seccion: 'marketing', etiqueta: 'Promociones', icono: 'Sparkles', ruta: '/admin/marketing/promociones', roles: ['admin'] },
   { id: 'medios-pago', seccion: 'marketing', etiqueta: 'Medios de pago', icono: 'Wallet', ruta: '/admin/marketing/medios-pago', roles: ['admin'] },

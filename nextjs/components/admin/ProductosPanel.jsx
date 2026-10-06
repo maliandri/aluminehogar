@@ -11,8 +11,12 @@ import {
   importarStockExcel,
 } from '@/services/api';
 import ProductForm from './ProductForm';
+import { useAdminSession } from '@/components/admin/AdminSession';
+import { puedeEditar } from '@/lib/permisos';
 
 export default function ProductosPanel() {
+  const { role } = useAdminSession();
+  const puedeEditarProductos = puedeEditar(role, 'productos');
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -189,14 +193,18 @@ export default function ProductosPanel() {
         >
           <FileDown className="w-4 h-4" /> Exportar stock
         </button>
+        {puedeEditarProductos && (
         <label className={`flex items-center gap-2 border border-orange-500 text-orange-600 px-4 py-2 rounded hover:bg-orange-50 text-sm cursor-pointer ${importingStock ? 'opacity-50 pointer-events-none' : ''}`}>
           {importingStock ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileUp className="w-4 h-4" />}
           {importingStock ? 'Importando...' : 'Importar stock'}
           <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportarExcel} />
         </label>
+        )}
+        {puedeEditarProductos && (
         <button onClick={handleCreate} className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 text-sm">
           + Crear Producto
         </button>
+        )}
       </div>
 
       {showForm && (
@@ -296,7 +304,9 @@ export default function ProductosPanel() {
                 <td className="px-4 py-3 text-sm">${producto.precio?.toLocaleString('es-AR')}</td>
                 <td className="px-4 py-3 text-sm">{producto.categoria}</td>
                 <td className="px-4 py-3">
-                  {stockEditId === producto._id ? (
+                  {!puedeEditarProductos ? (
+                    <span className="text-sm font-medium">{producto.stock || 0}</span>
+                  ) : stockEditId === producto._id ? (
                     <input
                       type="number"
                       min="0"
@@ -332,6 +342,11 @@ export default function ProductosPanel() {
                   )}
                 </td>
                 <td className="px-4 py-3">
+                  {!puedeEditarProductos ? (
+                    <span className={`text-xs font-medium ${producto.mostrar === 'si' ? 'text-green-700' : 'text-gray-500'}`}>
+                      {producto.mostrar === 'si' ? 'Sí' : 'No'}
+                    </span>
+                  ) : (
                   <button
                     type="button"
                     role="switch"
@@ -351,6 +366,7 @@ export default function ProductosPanel() {
                       {producto.mostrar === 'si' ? 'Sí' : 'No'}
                     </span>
                   </button>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <span className={`px-2 py-1 rounded text-xs ${
@@ -360,8 +376,10 @@ export default function ProductosPanel() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right space-x-2">
+                  {puedeEditarProductos && (<>
                   <button onClick={() => handleEdit(producto)} className="text-blue-600 hover:text-blue-800 text-sm">Editar</button>
                   <button onClick={() => handleDelete(producto._id, producto.nombre)} className="text-red-600 hover:text-red-800 text-sm">Eliminar</button>
+                  </>)}
                 </td>
               </tr>
               );

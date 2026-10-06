@@ -4,7 +4,7 @@ import Product from '@/lib/models/Product';
 import User from '@/lib/models/User';
 import Conversation from '@/lib/models/Conversation';
 import Deposito from '@/lib/models/Deposito';
-import { extractTokenFromHeaders, verifyToken, requireAdmin } from '@/lib/auth-helpers';
+import { extractTokenFromHeaders, verifyToken, requireAdmin, requireRole } from '@/lib/auth-helpers';
 import { v2 as cloudinary } from 'cloudinary';
 import { getCloudinaryUrl, IMG_THUMB, IMG_CARD } from '@/lib/cloudinary';
 import { MAPEO_NOMBRES_CLOUDINARY } from '@/lib/cloudinary-mapeo-nombres';
@@ -30,9 +30,17 @@ function authenticateAdmin(request) {
   return decoded;
 }
 
+function authenticateRole(request, roles) {
+  const token = extractTokenFromHeaders(request.headers);
+  if (!token) throw new Error('Token de autenticacion requerido');
+  const decoded = verifyToken(token);
+  requireRole(decoded, roles);
+  return decoded;
+}
+
 export async function GET(request) {
   try {
-    const decoded = authenticateAdmin(request);
+    const decoded = authenticateRole(request, ['admin', 'vendedor']);
 
     // El panel pregunta acá si el token pertenece a un admin antes de mostrar nada (no toca la base)
     if (request.nextUrl.searchParams.get('action') === 'me') {
@@ -41,6 +49,10 @@ export async function GET(request) {
         usuario: { id: decoded.userId, email: decoded.email, role: decoded.role }
       });
     }
+
+    // Solo el listado de productos (sin action) puede verlo un vendedor; el resto de las acciones es solo admin
+    const accionGet = request.nextUrl.searchParams.get('action');
+    if (accionGet) requireAdmin(decoded);
 
     await connectDB();
 
@@ -124,7 +136,7 @@ export async function GET(request) {
 
     return NextResponse.json({ success: true, productos, total: productos.length });
   } catch (error) {
-    if (error.message.includes('Token') || error.message.includes('administrador')) {
+    if (error.message.includes('Token') || error.message.includes('administrador') || error.message.includes('Acceso denegado')) {
       return NextResponse.json({ error: error.message }, { status: 403 });
     }
     return NextResponse.json({ error: 'Error en el servidor' }, { status: 500 });
