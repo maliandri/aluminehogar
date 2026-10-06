@@ -108,7 +108,7 @@ export default function MenuEditorPanel() {
       </div>
 
       {mensaje && (
-        <div className="rounded-lg p-4 text-sm border bg-red-50 border-red-200 text-red-800">
+        <div role="alert" className="rounded-lg p-4 text-sm border bg-red-50 border-red-200 text-red-800">
           {mensaje.texto}
           {errores.length > 0 && (
             <ul className="list-disc ml-5 mt-2">{errores.map((er) => <li key={er}>{er}</li>)}</ul>

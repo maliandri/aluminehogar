@@ -9,6 +9,7 @@ import ChatBot from '@/components/ChatBot';
 import { PublicChrome } from '@/components/PublicChrome';
 import { SiteProvider } from '@/components/SiteProvider';
 import { getSiteConfig } from '@/lib/site-config';
+import { configPublica } from '@/lib/site-validate';
 
 export const metadata = {
   metadataBase: new URL('https://aluminehogar.com.ar'),
@@ -42,7 +43,7 @@ export const metadata = {
 };
 
 export default async function RootLayout({ children }) {
-  const site = await getSiteConfig();
+  const site = configPublica(await getSiteConfig());
   return (
     <html lang="es">
       <head>

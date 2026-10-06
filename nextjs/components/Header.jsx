@@ -84,14 +84,14 @@ export const Header = () => {
 
               {isAuthenticated && isAccountMenuOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl py-2 text-gray-700 z-50">
-                  {isAdmin() && (
+                  {isVendedor() && (
                     <a
                       href="/admin"
                       className="flex items-center space-x-2 px-4 py-2 hover:bg-gray-100 transition-colors"
                       onClick={() => setIsAccountMenuOpen(false)}
                     >
                       <ShieldCheck className="w-4 h-4" />
-                      <span>Panel Admin</span>
+                      <span>{isAdmin() ? 'Panel Admin' : 'Panel de gestión'}</span>
                     </a>
                   )}
                   {isVendedor() && (
@@ -175,13 +175,13 @@ export const Header = () => {
               <MessageSquare className="w-4 h-4" />
               Alumine Bot
             </a>
-            {isAuthenticated && isAdmin() && (
+            {isAuthenticated && isVendedor() && (
               <a
                 href="/admin"
                 className="block text-white hover:text-purple-200 transition-colors font-medium"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Panel Admin
+                {isAdmin() ? 'Panel Admin' : 'Panel de gestión'}
               </a>
             )}
             {isAuthenticated && isVendedor() && (

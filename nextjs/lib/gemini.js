@@ -76,8 +76,7 @@ function buildSystemPrompt(productContext, site) {
 - WhatsApp: ${t.telefono}
 - Sitio web: https://aluminehogar.com.ar
 - Envios: A todo el pais
-- ${c.envio}
-- Formas de pago: ${c.formasDePago}
+${[c.envio && `- ${c.envio}`, c.formasDePago && `- Formas de pago: ${c.formasDePago}`].filter(Boolean).join('\n')}
 
 **POLITICAS:**
 ${c.politicas.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => `- ${l}`).join('\n')}

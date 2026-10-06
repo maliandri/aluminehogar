@@ -46,7 +46,7 @@ export default function AdminLayout({ children }) {
     if (!usuario) return;
     let cancelado = false;
     obtenerMenuPanel()
-      .then((data) => { if (!cancelado) setMenu(data.menu); })
+      .then((data) => { if (!cancelado) setMenu(data.menu || resolverMenu(null, usuario.role)); })
       .catch(() => { if (!cancelado) setMenu(resolverMenu(null, usuario.role)); });
     return () => { cancelado = true; };
   }, [usuario]);

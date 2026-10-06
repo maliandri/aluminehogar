@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { obtenerSiteConfig, guardarSiteConfig } from '@/services/api';
+import { obtenerSiteConfigAdmin, guardarSiteConfig } from '@/services/api';
 
 // Grupos y campos del formulario (los mismos que valida el servidor)
 const GRUPOS = [
@@ -54,7 +54,7 @@ export default function ConfigSitioPanel() {
   const [errores, setErrores] = useState([]);
 
   useEffect(() => {
-    obtenerSiteConfig()
+    obtenerSiteConfigAdmin()
       .then((data) => setConfig(data.config))
       .catch(() => setMensaje({ tipo: 'error', texto: 'No se pudo cargar la configuración' }));
   }, []);
@@ -112,7 +112,7 @@ export default function ConfigSitioPanel() {
       ))}
 
       {mensaje && (
-        <div className={`rounded-lg p-4 text-sm border ${mensaje.tipo === 'ok' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+        <div role={mensaje.tipo === 'ok' ? 'status' : 'alert'} className={`rounded-lg p-4 text-sm border ${mensaje.tipo === 'ok' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
           {mensaje.texto}
           {errores.length > 0 && (
             <ul className="list-disc ml-5 mt-2">

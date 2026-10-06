@@ -419,8 +419,8 @@ export const verificarAdmin = async () => {
 
 // =================== CONFIGURACION DEL SITIO ===================
 
-export const obtenerSiteConfig = async () => {
-  const response = await api.get('/site-config');
+export const obtenerSiteConfigAdmin = async () => {
+  const response = await api.get('/site-config?action=admin');
   return response.data;
 };
 

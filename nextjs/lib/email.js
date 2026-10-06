@@ -8,10 +8,12 @@ function getResend() {
 }
 
 // Pie común de las plantillas: nombre, ciudad y contacto de la tienda
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 function pieEmail(t) {
   return `
-        <p style="margin: 0;">${t.nombre} - ${t.ciudad}, Argentina</p>
-        <p style="margin: 5px 0 0;">${t.telefono} | ${t.emailContacto}</p>`;
+        <p style="margin: 0;">${esc(t.nombre)} - ${esc(t.ciudad)}, Argentina</p>
+        <p style="margin: 5px 0 0;">${esc(t.telefono)} | ${esc(t.emailContacto)}</p>`;
 }
 
 export function emailBienvenida(nombre, t) {

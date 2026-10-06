@@ -4,7 +4,7 @@ import { connectDB } from '@/lib/db';
 import SiteConfig from '@/lib/models/SiteConfig';
 import { extractTokenFromHeaders, verifyToken, requireAdmin } from '@/lib/auth-helpers';
 import { getSiteConfig, SITE_CONFIG_TAG } from '@/lib/site-config';
-import { validarSiteConfig } from '@/lib/site-validate';
+import { validarSiteConfig, configPublica, mezclarConDefaults } from '@/lib/site-validate';
 
 function authenticateAdmin(request) {
   const token = extractTokenFromHeaders(request.headers);
@@ -14,10 +14,25 @@ function authenticateAdmin(request) {
   return decoded;
 }
 
-// GET público: solo expone datos que el sitio ya muestra (teléfono, WhatsApp, textos, etc.)
-export async function GET() {
-  const config = await getSiteConfig();
-  return NextResponse.json({ success: true, config });
+// GET público: solo expone datos que el sitio ya muestra (sin el email de avisos internos).
+// GET ?action=admin: config completa leída sin caché, solo para administradores.
+export async function GET(request) {
+  try {
+    if (new URL(request.url).searchParams.get('action') === 'admin') {
+      authenticateAdmin(request);
+      await connectDB();
+      const doc = await SiteConfig.findById('default').lean();
+      return NextResponse.json({ success: true, config: mezclarConDefaults(doc) });
+    }
+    const config = configPublica(await getSiteConfig());
+    return NextResponse.json({ success: true, config });
+  } catch (error) {
+    if (error.message.includes('Token') || error.message.includes('administrador')) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    console.error('Error en site-config GET:', error);
+    return NextResponse.json({ error: 'Error en el servidor' }, { status: 500 });
+  }
 }
 
 export async function PUT(request) {

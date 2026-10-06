@@ -9,7 +9,7 @@ import assert from 'assert/strict';
 
 const lib = (f) => import(pathToFileURL(path.join(process.cwd(), 'nextjs/lib', f)).href);
 const { SITE_DEFAULTS } = await lib('site-defaults.js');
-const { mezclarConDefaults, validarSiteConfig } = await lib('site-validate.js');
+const { mezclarConDefaults, validarSiteConfig, configPublica } = await lib('site-validate.js');
 const { telHref, waUrl } = await lib('site-format.js');
 
 const problemas = [];
@@ -54,6 +54,19 @@ t('valor recortado y sin campos extra', () => {
 t('telHref', () => assert.equal(telHref('+54 9 299 576-9999'), 'tel:+5492995769999'));
 t('waUrl sin mensaje', () => assert.equal(waUrl('5492995769999'), 'https://wa.me/5492995769999'));
 t('waUrl con mensaje', () => assert.equal(waUrl('5492995769999', 'Hola mundo'), 'https://wa.me/5492995769999?text=Hola%20mundo'));
+
+t('configPublica saca el email de avisos y conserva el resto', () => {
+  const p = configPublica(SITE_DEFAULTS);
+  assert.equal('emailNotificaciones' in p.tienda, false);
+  for (const k of Object.keys(SITE_DEFAULTS.tienda)) if (k !== 'emailNotificaciones') assert.equal(p.tienda[k], SITE_DEFAULTS.tienda[k]);
+  for (const g of ['redes', 'inicio', 'chatbot']) assert.deepEqual(p[g], SITE_DEFAULTS[g]);
+});
+t('configPublica no muta la entrada', () => {
+  const c = structuredClone(SITE_DEFAULTS);
+  configPublica(c);
+  assert.equal(c.tienda.emailNotificaciones, SITE_DEFAULTS.tienda.emailNotificaciones);
+  assert.notEqual(configPublica(c).tienda, c.tienda);
+});
 
 if (problemas.length) {
   console.error(`✗ ${problemas.length} problema(s):\n` + problemas.map((p) => '  - ' + p).join('\n'));

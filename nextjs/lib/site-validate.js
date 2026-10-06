@@ -52,6 +52,13 @@ export function mezclarConDefaults(guardado) {
   return salida;
 }
 
+// Copia de la config para el público: sin el email donde llegan los avisos internos.
+export function configPublica(config) {
+  const copia = structuredClone(config);
+  if (copia?.tienda) delete copia.tienda.emailNotificaciones;
+  return copia;
+}
+
 // Valida lo que llega del formulario. Devuelve el valor limpio (recortado y sin campos extra).
 export function validarSiteConfig(entrada) {
   const errores = [];
