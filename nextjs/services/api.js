@@ -428,3 +428,25 @@ export const guardarSiteConfig = async (config) => {
   const response = await api.put('/site-config', config);
   return response.data;
 };
+
+// =================== MENU DEL PANEL ===================
+
+export const obtenerMenuPanel = async () => {
+  const response = await api.get('/admin-menu');
+  return response.data;
+};
+
+export const obtenerConfigMenu = async () => {
+  const response = await api.get('/admin-menu?action=config');
+  return response.data;
+};
+
+export const guardarMenu = async (config) => {
+  const response = await api.put('/admin-menu', config);
+  return response.data;
+};
+
+export const restaurarMenu = async () => {
+  const response = await api.delete('/admin-menu');
+  return response.data;
+};
