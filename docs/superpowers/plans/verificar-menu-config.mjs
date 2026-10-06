@@ -120,6 +120,17 @@ t('una pantalla nueva del código aparece aunque no esté guardada', () => {
   assert.equal(normalizarMenu(m).items.some((i) => i.id === 'promociones'), true);
 });
 
+for (const id of ['constructor', '__proto__', 'toString']) {
+  t(`validar rechaza el id heredado ${id}`, () => {
+    const m = clon(); m.items.push({ id, seccion: 'store', etiqueta: 'x', visible: false, roles: [] });
+    assert.equal(validarMenu(m).ok, false);
+  });
+  t(`normalizar descarta el id heredado ${id}`, () => {
+    const m = clon(); m.items.push({ id, seccion: 'store', etiqueta: 'x', visible: false, roles: [] });
+    assert.equal(normalizarMenu(m).items.some((i) => i.id === id), false);
+  });
+}
+
 if (problemas.length) {
   console.error(`✗ ${problemas.length} problema(s):\n` + problemas.map((p) => '  - ' + p).join('\n'));
   process.exit(1);

@@ -48,6 +48,12 @@ t('rolesQueVen', () => {
   assert.deepEqual(rolesQueVen('usuarios'), ['admin']);
   assert.deepEqual(rolesQueVen('no-existe'), []);
 });
+t('ids heredados del prototipo no son pantallas', () => {
+  assert.equal(puedeVer('admin', 'constructor'), false);
+  assert.equal(puedeEditar('admin', '__proto__'), false);
+  assert.equal(puedeVer('admin', 'toString'), false);
+  assert.deepEqual(rolesQueVen('toString'), []);
+});
 t('cada pantalla del menú tiene permisos', () => {
   for (const i of ITEMS) assert.ok(PANTALLAS[i.id], `falta ${i.id} en PANTALLAS`);
 });

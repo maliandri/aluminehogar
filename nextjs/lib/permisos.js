@@ -15,13 +15,13 @@ export const PANTALLAS = {
 };
 
 export function puedeVer(rol, pantalla) {
-  return Boolean(PANTALLAS[pantalla]?.ver.includes(rol));
+  return Object.hasOwn(PANTALLAS, pantalla) && PANTALLAS[pantalla].ver.includes(rol);
 }
 
 export function puedeEditar(rol, pantalla) {
-  return Boolean(PANTALLAS[pantalla]?.editar.includes(rol));
+  return Object.hasOwn(PANTALLAS, pantalla) && PANTALLAS[pantalla].editar.includes(rol);
 }
 
 export function rolesQueVen(pantalla) {
-  return [...(PANTALLAS[pantalla]?.ver ?? [])];
+  return Object.hasOwn(PANTALLAS, pantalla) ? [...PANTALLAS[pantalla].ver] : [];
 }

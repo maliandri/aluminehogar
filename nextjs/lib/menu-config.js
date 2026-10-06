@@ -10,7 +10,8 @@ const MAX_NOMBRE = 40;
 const ID_SECCION = /^[a-z0-9-]{1,40}$/;
 
 // El catálogo (ruta, ícono, permisos) sale siempre del código: lo guardado nunca puede apuntar a rutas inventadas
-const catalogo = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
+// Sin prototipo: ids como 'constructor' o '__proto__' no deben resolverse como pantallas
+const catalogo = Object.assign(Object.create(null), Object.fromEntries(ITEMS.map((i) => [i.id, i])));
 
 export function menuDeFabrica() {
   return {
