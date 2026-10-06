@@ -30,13 +30,21 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token inválido o expirado
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('userEmail');
-        window.location.href = '/';
-      }
+    const status = error.response?.status;
+    const mensaje = String(error.response?.data?.error || '');
+
+    // 401, o un 403 cuyo motivo es la llave de sesión ("Token invalido o expirado"): la sesión ya no sirve.
+    // Un 403 por falta de permisos ("Acceso denegado...") NO cierra la sesión.
+    const sesionVencida = status === 401 || (status === 403 && mensaje.includes('Token'));
+
+    if (sesionVencida && typeof window !== 'undefined') {
+      // Solo si había una sesión guardada (evita redirigir a quien nunca inició sesión)
+      const habiaSesion = Boolean(localStorage.getItem('authToken'));
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('userEmail');
+      // Estado persistido de la sesión (zustand): si queda, la pantalla cree que seguís adentro
+      localStorage.removeItem('auth-storage');
+      if (status === 401 || habiaSesion) window.location.href = '/';
     }
     return Promise.reject(error);
   }
