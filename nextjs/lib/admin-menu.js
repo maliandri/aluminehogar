@@ -20,6 +20,7 @@ export const ITEMS = [
   { id: 'medios-pago', seccion: 'marketing', etiqueta: 'Medios de pago', icono: 'Wallet', ruta: '/admin/marketing/medios-pago', roles: ['admin'] },
   { id: 'usuarios', seccion: 'configuracion', etiqueta: 'Usuarios', icono: 'Users', ruta: '/admin/configuracion/usuarios', roles: ['admin'] },
   { id: 'config-sitio', seccion: 'configuracion', etiqueta: 'Configuración del sitio', icono: 'Settings', ruta: '/admin/configuracion/sitio', roles: ['admin'] },
+  { id: 'editar-menu', seccion: 'configuracion', etiqueta: 'Editar menú del panel', icono: 'Menu', ruta: '/admin/configuracion/menu', roles: ['admin'] },
 ];
 
 // true solo para /admin y /admin/...; no para rutas que apenas empiezan igual (/administrador)
