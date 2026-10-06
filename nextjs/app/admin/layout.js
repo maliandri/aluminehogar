@@ -5,27 +5,31 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu, LogOut, ExternalLink, Loader2,
-  ShoppingCart, Store, Megaphone, Settings,
+  ShoppingCart, Store, Megaphone, Settings, Folder,
   CreditCard, MessageSquare, Package, Warehouse, FileUp, Sparkles, Wallet, Users,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
-import { verificarAdmin } from '@/services/api';
-import { seccionesVisibles, seccionDeRuta } from '@/lib/admin-menu';
+import { verificarAdmin, obtenerMenuPanel } from '@/services/api';
+import { seccionDeRuta } from '@/lib/admin-menu';
+import { resolverMenu } from '@/lib/menu-config';
 import { AdminSessionProvider } from '@/components/admin/AdminSession';
 
-// El menú guarda los íconos por nombre (para poder editarlo desde la base en el proyecto B); acá se resuelven
-const ICONOS = { ShoppingCart, Store, Megaphone, Settings, CreditCard, MessageSquare, Package, Warehouse, FileUp, Sparkles, Wallet, Users };
+// El menú guarda los íconos por nombre; acá se resuelven
+const ICONOS = { ShoppingCart, Store, Megaphone, Settings, Folder, Menu, CreditCard, MessageSquare, Package, Warehouse, FileUp, Sparkles, Wallet, Users };
 
 function Icono({ nombre, className }) {
   const Componente = ICONOS[nombre];
   return Componente ? <Componente className={className} /> : null;
 }
 
+const coincide = (pathname, ruta) => pathname === ruta || pathname.startsWith(ruta + '/');
+
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
   const [usuario, setUsuario] = useState(null);
+  const [menu, setMenu] = useState(null);
   const [menuAbierto, setMenuAbierto] = useState(false);
 
   // Verifica el rol contra el servidor. No se dibuja nada del panel hasta tener respuesta.
@@ -37,10 +41,27 @@ export default function AdminLayout({ children }) {
     return () => { cancelado = true; };
   }, [router]);
 
+  // Con el usuario verificado, pide el menú ya filtrado por su rol. Si falla, usa el de fábrica del código.
+  useEffect(() => {
+    if (!usuario) return;
+    let cancelado = false;
+    obtenerMenuPanel()
+      .then((data) => { if (!cancelado) setMenu(data.menu); })
+      .catch(() => { if (!cancelado) setMenu(resolverMenu(null, usuario.role)); });
+    return () => { cancelado = true; };
+  }, [usuario]);
+
   // En celular el menú se cierra al navegar
   useEffect(() => { setMenuAbierto(false); }, [pathname]);
 
-  if (!usuario) {
+  // Una pantalla del catálogo que este rol no ve: se lo lleva a la primera que sí ve
+  const esPantalla = seccionDeRuta(pathname) !== null;
+  const permitida = !menu || !esPantalla || menu.some((s) => s.items.some((it) => coincide(pathname, it.ruta)));
+  useEffect(() => {
+    if (menu && esPantalla && !permitida && menu[0]) router.replace(menu[0].items[0].ruta);
+  }, [menu, esPantalla, permitida, router]);
+
+  if (!usuario || !menu || (esPantalla && !permitida && menu.length > 0)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">
         <Loader2 className="w-6 h-6 animate-spin mr-2" /> Verificando acceso...
@@ -48,9 +69,8 @@ export default function AdminLayout({ children }) {
     );
   }
 
-  const secciones = seccionesVisibles(usuario.role);
-  const idActiva = seccionDeRuta(pathname);
-  const activa = secciones.find((s) => s.id === idActiva);
+  const idActiva = menu.find((s) => s.items.some((it) => coincide(pathname, it.ruta)))?.id;
+  const activa = menu.find((s) => s.id === idActiva);
 
   const handleLogout = () => {
     logout();
@@ -64,7 +84,7 @@ export default function AdminLayout({ children }) {
         <div className="text-xs text-white/60 uppercase tracking-wide">Sistema de gestión</div>
       </div>
       <ul className="flex-1 overflow-y-auto py-3">
-        {secciones.map((s) => (
+        {menu.map((s) => (
           <li key={s.id}>
             <Link
               href={s.items[0].ruta}
@@ -118,7 +138,7 @@ export default function AdminLayout({ children }) {
         {activa && (
           <nav aria-label="Pestañas de la sección" className="bg-white border-b px-6 flex gap-1 overflow-x-auto">
             {activa.items.map((it) => {
-              const actual = pathname === it.ruta || pathname.startsWith(it.ruta + '/');
+              const actual = coincide(pathname, it.ruta);
               return (
                 <Link
                   key={it.id}
@@ -135,7 +155,15 @@ export default function AdminLayout({ children }) {
             })}
           </nav>
         )}
-        <div className="p-6"><AdminSessionProvider value={usuario}>{children}</AdminSessionProvider></div>
+        <div className="p-6">
+          {menu.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              No tenés pantallas habilitadas en el panel. Pedile al administrador que te habilite alguna.
+            </div>
+          ) : (
+            <AdminSessionProvider value={usuario}>{children}</AdminSessionProvider>
+          )}
+        </div>
       </div>
     </div>
   );
