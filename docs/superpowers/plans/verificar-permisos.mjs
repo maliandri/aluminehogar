@@ -61,6 +61,22 @@ t('los roles por defecto del menú están permitidos', () => {
   for (const i of ITEMS) for (const r of i.roles) assert.ok(rolesQueVen(i.id).includes(r), `${i.id}: ${r} no puede verla`);
 });
 
+t('clientes: admin y vendedor ven y editan', () => {
+  for (const rol of ['admin', 'vendedor']) {
+    assert.equal(puedeVer(rol, 'clientes'), true, rol);
+    assert.equal(puedeEditar(rol, 'clientes'), true, rol);
+  }
+  assert.equal(puedeVer('customer', 'clientes'), false);
+});
+for (const id of ['planes-credito', 'mercado-pago']) {
+  t(`${id}: solo admin`, () => {
+    assert.equal(puedeVer('admin', id), true);
+    assert.equal(puedeEditar('admin', id), true);
+    assert.equal(puedeVer('vendedor', id), false);
+    assert.equal(puedeEditar('vendedor', id), false);
+  });
+}
+
 if (problemas.length) {
   console.error(`✗ ${problemas.length} problema(s):\n` + problemas.map((p) => '  - ' + p).join('\n'));
   process.exit(1);
