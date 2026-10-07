@@ -450,3 +450,15 @@ export const restaurarMenu = async () => {
   const response = await api.delete('/admin-menu');
   return response.data;
 };
+
+// =================== CONFIGURACION DEL CREDITO PROPIO ===================
+
+export const obtenerCreditoConfig = async () => {
+  const response = await api.get('/credito-config');
+  return response.data;
+};
+
+export const guardarCreditoConfig = async (config) => {
+  const response = await api.put('/credito-config', config);
+  return response.data;
+};
