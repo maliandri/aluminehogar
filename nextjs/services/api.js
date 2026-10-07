@@ -277,6 +277,17 @@ export const marcarCuotaCredito = async (id, numero) => {
   return response.data;
 };
 
+export const registrarCobroCredito = async (id, numero, metodo, archivo) => {
+  const response = await api.post('/creditos', { action: 'registrar-cobro', id, numero, metodo, archivo });
+  return response.data;
+};
+
+// Devuelve el comprobante como Blob (el navegador no puede mandar el token en un <a>)
+export const obtenerComprobanteCredito = async (id, numero) => {
+  const response = await api.get('/creditos/comprobante', { params: { id, numero }, responseType: 'blob' });
+  return response.data;
+};
+
 export const aprobarCredito = async (id) => {
   const response = await api.post('/creditos', { action: 'aprobar', id });
   return response.data;

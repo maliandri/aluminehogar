@@ -7,6 +7,7 @@ import User from '@/lib/models/User';
 import Product from '@/lib/models/Product';
 import { extractTokenFromHeaders, verifyToken, requireRole } from '@/lib/auth-helpers';
 import { getCreditoConfig } from '@/lib/credito-config';
+import { subirPrivado } from '@/lib/archivos-privados';
 import { calcularPlan, evaluarAprobacion, buscarPlan } from '@/lib/credito-calculo';
 
 async function ajustarStockDeposito(productos, depositoId, delta) {
@@ -68,7 +69,7 @@ export async function GET(request) {
   }
 }
 
-// POST /api/creditos -> body { action: 'create' | 'marcar-cuota' | 'aprobar' | 'rechazar', ... }
+// POST /api/creditos -> body { action: 'create' | 'registrar-cobro' | 'aprobar' | 'rechazar', ... }
 export async function POST(request) {
   try {
     await connectDB();
@@ -137,34 +138,61 @@ export async function POST(request) {
       return NextResponse.json({ success: true, credito }, { status: 201 });
     }
 
-    if (action === 'marcar-cuota') {
+    if (action === 'registrar-cobro') {
       const decoded = authenticate(request, ['vendedor', 'admin']);
-      const { id, numero } = body;
+      const { id, metodo, archivo } = body;
+      const numero = Number(body.numero);
 
-      if (!id || !numero) {
-        return NextResponse.json({ error: 'ID de credito y numero de cuota son requeridos' }, { status: 400 });
+      if (!mongoose.isValidObjectId(id) || !Number.isInteger(numero) || numero < 0) {
+        return NextResponse.json({ error: 'Crédito y número de cuota son requeridos' }, { status: 400 });
+      }
+      if (!['comprobante', 'efectivo'].includes(metodo)) {
+        return NextResponse.json({ error: 'Elegí cómo se cobró: comprobante o cobrado en mano' }, { status: 400 });
       }
 
       const credito = await CreditoVenta.findById(id);
-      if (!credito) {
+      // Un crédito ajeno se responde igual que uno inexistente
+      if (!credito || (decoded.role !== 'admin' && (!decoded.userId || String(credito.vendedorId) !== decoded.userId))) {
         return NextResponse.json({ error: 'Credito no encontrado' }, { status: 404 });
       }
-      if (decoded.role !== 'admin' && credito.vendedorId.toString() !== decoded.userId) {
-        return NextResponse.json({ error: 'Acceso denegado: no es el vendedor de este credito' }, { status: 403 });
+      if (credito.estado === 'rechazado') {
+        return NextResponse.json({ error: 'El crédito fue rechazado' }, { status: 400 });
       }
 
-      const cuota = credito.cuotas.find(c => c.numero === numero);
-      if (!cuota) {
-        return NextResponse.json({ error: 'Cuota no encontrada' }, { status: 404 });
+      let cuota = null;
+      if (numero === 0) {
+        if (!(credito.anticipo > 0)) {
+          return NextResponse.json({ error: 'Este crédito no tiene anticipo' }, { status: 400 });
+        }
+        if (credito.anticipoPago?.estado === 'cobrado') {
+          return NextResponse.json({ error: 'El anticipo ya está registrado como cobrado' }, { status: 409 });
+        }
+      } else {
+        if (credito.estado !== 'activo') {
+          return NextResponse.json({ error: 'El crédito tiene que estar activo para cobrar cuotas' }, { status: 400 });
+        }
+        cuota = credito.cuotas.find((c) => c.numero === numero);
+        if (!cuota) return NextResponse.json({ error: 'Cuota no encontrada' }, { status: 404 });
+        if (cuota.estado === 'pagada') {
+          return NextResponse.json({ error: 'Esa cuota ya está registrada como pagada' }, { status: 409 });
+        }
       }
 
-      cuota.estado = 'pagada';
-      cuota.fechaPago = new Date();
-
-      if (credito.cuotas.every(c => c.estado === 'pagada')) {
-        credito.estado = 'completado';
+      let comprobante;
+      if (metodo === 'comprobante') {
+        comprobante = await subirPrivado(archivo, `comprobantes/${credito._id}`);
       }
+      const registradoPor = { userId: decoded.userId, nombre: await nombreDe(decoded.userId) };
+      const fecha = new Date();
 
+      if (numero === 0) {
+        credito.anticipoPago = { estado: 'cobrado', metodo, comprobante, registradoPor, fecha };
+      } else {
+        cuota.estado = 'pagada';
+        cuota.fechaPago = fecha;
+        cuota.pago = { metodo, comprobante, registradoPor, fecha };
+        if (credito.cuotas.every((c) => c.estado === 'pagada')) credito.estado = 'completado';
+      }
       await credito.save();
 
       return NextResponse.json({ success: true, credito });
@@ -215,6 +243,9 @@ function handleError(error) {
   }
   if (error.message === 'Token invalido o expirado' || error.message === 'Token de autenticacion requerido') {
     return NextResponse.json({ error: error.message }, { status: 401 });
+  }
+  if (error.status === 400) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
   return NextResponse.json({ error: 'Error en el servidor.' }, { status: 500 });
 }
