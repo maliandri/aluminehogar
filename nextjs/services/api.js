@@ -462,3 +462,36 @@ export const guardarCreditoConfig = async (config) => {
   const response = await api.put('/credito-config', config);
   return response.data;
 };
+
+// =================== CLIENTES ===================
+
+export const listarClientes = async (q = '') => {
+  const response = await api.get('/clientes', { params: q ? { q } : {} });
+  return response.data;
+};
+
+export const obtenerCliente = async (id) => {
+  const response = await api.get('/clientes', { params: { id } });
+  return response.data;
+};
+
+export const crearCliente = async (cliente) => {
+  const response = await api.post('/clientes', { action: 'create', cliente });
+  return response.data;
+};
+
+export const actualizarCliente = async (id, cliente) => {
+  const response = await api.post('/clientes', { action: 'update', id, cliente });
+  return response.data;
+};
+
+export const subirArchivoCliente = async (id, tipo, archivo) => {
+  const response = await api.post('/clientes', { action: 'subir-archivo', id, tipo, archivo });
+  return response.data;
+};
+
+// Devuelve el archivo como Blob (el navegador no puede mandar el token en un <img> o <a>)
+export const obtenerArchivoCliente = async (id, tipo) => {
+  const response = await api.get('/clientes/archivo', { params: { id, tipo }, responseType: 'blob' });
+  return response.data;
+};
