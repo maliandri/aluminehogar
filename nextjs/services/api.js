@@ -272,11 +272,6 @@ export const listarCreditos = async () => {
   return response.data;
 };
 
-export const marcarCuotaCredito = async (id, numero) => {
-  const response = await api.post('/creditos', { action: 'marcar-cuota', id, numero });
-  return response.data;
-};
-
 export const registrarCobroCredito = async (id, numero, metodo, archivo) => {
   const response = await api.post('/creditos', { action: 'registrar-cobro', id, numero, metodo, archivo });
   return response.data;

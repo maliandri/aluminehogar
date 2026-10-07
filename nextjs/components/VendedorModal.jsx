@@ -4,7 +4,11 @@ import { useState, useEffect } from 'react';
 import { X, FileDown, Send, Trash2, Percent, CreditCard, List } from 'lucide-react';
 import { CloudinaryImage } from './CloudinaryImage';
 import jsPDF from 'jspdf';
-import { enviarPresupuesto, crearCredito, listarCreditos, marcarCuotaCredito, listarDepositos, listarMediosPago, listarPromociones } from '@/services/api';
+import { enviarPresupuesto, crearCredito, listarCreditos, obtenerCreditoConfig, registrarCobroCredito, obtenerComprobanteCredito, listarDepositos, listarMediosPago, listarPromociones } from '@/services/api';
+import ClienteSelector from '@/components/clientes/ClienteSelector';
+import CobroDialog from '@/components/clientes/CobroDialog';
+import { abrirBlobEnPestana } from '@/lib/abrir-archivo';
+import { calcularPlan, evaluarAprobacion } from '@/lib/credito-calculo';
 import { calcularTotalConMedioPago, productoAplica } from '@/lib/pricing';
 
 export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
@@ -353,8 +357,6 @@ export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
           {activeTab === 'credito' && (
             <OtorgarCreditoTab
               carritoVendedor={carritoVendedor}
-              cliente={cliente}
-              setCliente={setCliente}
               calcularTotal={calcularTotal}
               onCreado={() => setActiveTab('mis-creditos')}
             />
@@ -367,15 +369,19 @@ export const VendedorModal = ({ isOpen, onClose, productos, categorias }) => {
   );
 };
 
-function OtorgarCreditoTab({ carritoVendedor, cliente, setCliente, calcularTotal, onCreado }) {
+function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
+  const [cliente, setCliente] = useState(null);
+  const [config, setConfig] = useState(null);
+  const [frecuencia, setFrecuencia] = useState('mensual');
+  const [cuotas, setCuotas] = useState('');
   const [anticipoPorcentaje, setAnticipoPorcentaje] = useState(20);
-  const [cantidadCuotas, setCantidadCuotas] = useState(3);
   const [depositos, setDepositos] = useState([]);
   const [depositoId, setDepositoId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    obtenerCreditoConfig().then((d) => setConfig(d.config)).catch(() => setError('No se pudieron cargar los planes de crédito'));
     listarDepositos().then((data) => {
       const virtuales = (data.depositos || []).filter(d => d.esVirtualVendedor && d.activo);
       setDepositos(virtuales);
@@ -383,35 +389,39 @@ function OtorgarCreditoTab({ carritoVendedor, cliente, setCliente, calcularTotal
     }).catch(() => {});
   }, []);
 
+  const planes = (config?.planes || []).filter((p) => p.frecuencia === frecuencia).sort((a, b) => a.cuotas - b.cuotas);
+  // Si el plan elegido ya no existe en esta frecuencia, se toma el primero disponible
+  const plan = planes.find((p) => p.cuotas === Number(cuotas)) || planes[0] || null;
+
   const montoTotal = calcularTotal();
   const anticipo = Math.round(montoTotal * (anticipoPorcentaje / 100));
+  const calculo = plan
+    ? calcularPlan({ montoTotal, anticipo, cantidadCuotas: plan.cuotas, frecuencia: plan.frecuencia, recargoPorcentaje: plan.recargo })
+    : null;
+  const aprobacion = plan && config
+    ? evaluarAprobacion({ montoTotal, plan, montoMaximoSinAprobacion: config.montoMaximoSinAprobacion })
+    : { requiere: false, motivo: '' };
+  const frecuenciasDisponibles = ['diaria', 'semanal', 'mensual'].filter((f) => (config?.planes || []).some((p) => p.frecuencia === f));
 
   const handleOtorgar = async () => {
     setError('');
     const items = Object.values(carritoVendedor);
-
-    if (items.length === 0) {
-      setError('Agrega productos en la pestana Presupuesto antes de otorgar el credito');
-      return;
-    }
-    if (!cliente.nombre) {
-      setError('Ingresa el nombre del cliente');
-      return;
-    }
+    if (items.length === 0) { setError('Agrega productos en la pestana Presupuesto antes de otorgar el credito'); return; }
+    if (!cliente) { setError('Elegí o cargá el cliente'); return; }
+    if (!plan || !calculo?.ok) { setError(calculo?.errores?.[0] || 'Elegí un plan de cuotas'); return; }
 
     setLoading(true);
     try {
       await crearCredito({
-        clienteNombre: cliente.nombre,
-        clienteTelefono: cliente.telefono,
-        clienteEmail: cliente.email,
+        clienteId: cliente._id,
         depositoId: depositoId || null,
         productos: items.map(i => ({ productId: i._id, nombre: i.nombre, precio: i.precio, cantidad: i.cantidad })),
         montoTotal,
         anticipo,
-        cantidadCuotas
+        frecuencia: plan.frecuencia,
+        cantidadCuotas: plan.cuotas
       });
-      alert('Credito otorgado correctamente');
+      alert(aprobacion.requiere ? 'Credito cargado: queda pendiente de aprobacion del administrador' : 'Credito otorgado correctamente');
       onCreado();
     } catch (err) {
       setError(err.response?.data?.error || 'No se pudo otorgar el credito');
@@ -429,14 +439,7 @@ function OtorgarCreditoTab({ carritoVendedor, cliente, setCliente, calcularTotal
 
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-lg p-3">{error}</div>}
 
-      <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-        <input type="text" value={cliente.nombre} onChange={(e) => setCliente({ ...cliente, nombre: e.target.value })}
-          className="input-field" placeholder="Nombre del cliente" />
-        <input type="tel" value={cliente.telefono} onChange={(e) => setCliente({ ...cliente, telefono: e.target.value })}
-          className="input-field" placeholder="Telefono" />
-        <input type="email" value={cliente.email} onChange={(e) => setCliente({ ...cliente, email: e.target.value })}
-          className="input-field" placeholder="Email (opcional)" />
-      </div>
+      <ClienteSelector value={cliente} onChange={setCliente} />
 
       <div className="bg-gray-50 p-4 rounded-lg space-y-3">
         <div className="flex justify-between text-sm">
@@ -449,16 +452,40 @@ function OtorgarCreditoTab({ carritoVendedor, cliente, setCliente, calcularTotal
             onChange={(e) => setAnticipoPorcentaje(Number(e.target.value))} className="input-field" />
           <p className="text-xs text-gray-500 mt-1">Anticipo: ${anticipo.toLocaleString('es-AR')}</p>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Cantidad de cuotas</label>
-          <input type="number" min="1" max="24" value={cantidadCuotas}
-            onChange={(e) => setCantidadCuotas(Number(e.target.value))} className="input-field" />
-          {cantidadCuotas > 0 && montoTotal > 0 && (
-            <p className="text-xs text-gray-500 mt-1">
-              {cantidadCuotas} cuotas de ${Math.round((montoTotal - anticipo) / cantidadCuotas).toLocaleString('es-AR')}
-            </p>
-          )}
-        </div>
+
+        {!config ? (
+          <p className="text-sm text-gray-500">Cargando planes...</p>
+        ) : frecuenciasDisponibles.length === 0 ? (
+          <p className="text-sm text-red-600">No hay planes de crédito habilitados. Pedile al administrador que los cargue.</p>
+        ) : (
+          <>
+            <div>
+              <label className="block text-sm font-medium mb-1">Frecuencia de las cuotas</label>
+              <select value={frecuencia} onChange={(e) => { setFrecuencia(e.target.value); setCuotas(''); }} className="input-field">
+                {frecuenciasDisponibles.map((f) => <option key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Plan</label>
+              <select value={plan?.cuotas ?? ''} onChange={(e) => setCuotas(e.target.value)} className="input-field">
+                {planes.map((p) => <option key={p.cuotas} value={p.cuotas}>{p.cuotas} cuotas {p.recargo > 0 ? `(+${p.recargo}%)` : '(sin recargo)'}</option>)}
+              </select>
+            </div>
+            {calculo?.ok && (
+              <div className="text-sm bg-white rounded p-3 border space-y-1">
+                <div className="flex justify-between"><span>Saldo a financiar</span><span>${calculo.montoFinanciado.toLocaleString('es-AR')}</span></div>
+                <div className="flex justify-between"><span>Recargo</span><span>${calculo.interes.toLocaleString('es-AR')}</span></div>
+                <div className="flex justify-between font-semibold"><span>{plan.cuotas} cuotas de</span><span>${calculo.montoCuota.toLocaleString('es-AR')}</span></div>
+                <div className="flex justify-between text-gray-500"><span>Total final</span><span>${calculo.totalFinal.toLocaleString('es-AR')}</span></div>
+              </div>
+            )}
+            {calculo && !calculo.ok && <p className="text-sm text-red-600">{calculo.errores[0]}</p>}
+            {aprobacion.requiere && (
+              <p className="text-sm bg-yellow-50 text-yellow-800 rounded p-2">Queda pendiente de aprobación del administrador: {aprobacion.motivo}</p>
+            )}
+          </>
+        )}
+
         {depositos.length > 0 && (
           <div>
             <label className="block text-sm font-medium mb-1">Deposito de origen</label>
@@ -469,7 +496,7 @@ function OtorgarCreditoTab({ carritoVendedor, cliente, setCliente, calcularTotal
         )}
       </div>
 
-      <button onClick={handleOtorgar} disabled={loading} className="w-full btn-primary disabled:opacity-50">
+      <button onClick={handleOtorgar} disabled={loading || !calculo?.ok} className="w-full btn-primary disabled:opacity-50">
         {loading ? 'Otorgando...' : 'Otorgar credito'}
       </button>
     </div>
@@ -479,6 +506,7 @@ function OtorgarCreditoTab({ carritoVendedor, cliente, setCliente, calcularTotal
 function MisCreditosTab({ isOpen }) {
   const [creditos, setCreditos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cobro, setCobro] = useState(null); // { credito, numero, titulo }
 
   useEffect(() => {
     if (isOpen) fetchCreditos();
@@ -496,14 +524,14 @@ function MisCreditosTab({ isOpen }) {
     }
   };
 
-  const handleMarcarPagada = async (id, numero) => {
-    try {
-      await marcarCuotaCredito(id, numero);
-      fetchCreditos();
-    } catch (err) {
-      alert(err.response?.data?.error || 'No se pudo marcar la cuota como pagada');
-    }
+  const confirmarCobro = async (metodo, archivo) => {
+    await registrarCobroCredito(cobro.credito._id, cobro.numero, metodo, archivo);
+    setCobro(null);
+    fetchCreditos();
   };
+
+  const verComprobante = (credito, numero) =>
+    abrirBlobEnPestana(obtenerComprobanteCredito(credito._id, numero)).catch(() => alert('No se pudo abrir el comprobante'));
 
   const estadoBadge = (estado) => {
     const styles = {
@@ -516,6 +544,8 @@ function MisCreditosTab({ isOpen }) {
     return <span className={`px-2 py-1 rounded text-xs font-medium ${styles[estado] || 'bg-gray-100'}`}>{labels[estado] || estado}</span>;
   };
 
+  const etiquetaPago = (pago) => (pago?.metodo === 'efectivo' ? 'Cobrada en mano' : 'Con comprobante');
+
   if (loading) return <div className="text-center py-12 text-gray-500">Cargando creditos...</div>;
 
   if (creditos.length === 0) {
@@ -524,6 +554,7 @@ function MisCreditosTab({ isOpen }) {
 
   return (
     <div className="space-y-4">
+      {cobro && <CobroDialog titulo={cobro.titulo} onConfirmar={confirmarCobro} onCancelar={() => setCobro(null)} />}
       {creditos.map((credito) => (
         <div key={credito._id} className="bg-gray-50 rounded-lg p-4">
           <div className="flex justify-between items-start mb-2">
@@ -533,23 +564,60 @@ function MisCreditosTab({ isOpen }) {
             </div>
             {estadoBadge(credito.estado)}
           </div>
-          <div className="text-sm text-gray-600 mb-3">
-            Total ${credito.montoTotal.toLocaleString('es-AR')} — Anticipo ${credito.anticipo.toLocaleString('es-AR')} — {credito.cantidadCuotas} cuotas
+          <div className="text-sm text-gray-600 mb-1">
+            Total ${credito.montoTotal.toLocaleString('es-AR')} — Anticipo ${credito.anticipo.toLocaleString('es-AR')} — {credito.cantidadCuotas} cuotas {{ diaria: 'diarias', semanal: 'semanales', mensual: 'mensuales' }[credito.frecuencia || 'mensual']}
+            {credito.recargoPorcentaje > 0 ? ` (+${credito.recargoPorcentaje}%)` : ''}
           </div>
+          {credito.aprobadoPor && (
+            <p className="text-xs text-gray-500 mb-3">
+              {credito.aprobadoPor.tipo === 'admin' ? `Aprobado por ${credito.aprobadoPor.nombre}` : 'Aprobación automática (dentro de los límites)'}
+            </p>
+          )}
+          {credito.estado === 'pendiente_aprobacion' && credito.motivoAprobacion && (
+            <p className="text-xs text-yellow-700 mb-3">{credito.motivoAprobacion}</p>
+          )}
+
           {credito.estado !== 'rechazado' && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {credito.cuotas.map((cuota) => (
-                <button
-                  key={cuota.numero}
-                  onClick={() => cuota.estado === 'pendiente' && handleMarcarPagada(credito._id, cuota.numero)}
-                  disabled={cuota.estado === 'pagada'}
-                  className={`text-xs rounded px-2 py-2 border ${cuota.estado === 'pagada' ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-gray-300 hover:bg-gray-100'}`}
-                >
-                  <div className="font-medium">Cuota {cuota.numero}</div>
-                  <div>${cuota.monto.toLocaleString('es-AR')}</div>
-                  <div>{cuota.estado === 'pagada' ? 'Pagada' : 'Marcar pagada'}</div>
-                </button>
-              ))}
+            <div className="space-y-3">
+              {credito.anticipo > 0 && (
+                <div className="flex items-center gap-3 text-sm bg-white border rounded p-2">
+                  <span className="font-medium">Anticipo ${credito.anticipo.toLocaleString('es-AR')}</span>
+                  {credito.anticipoPago?.estado === 'cobrado' ? (
+                    <>
+                      <span className="text-green-700">Cobrado — {etiquetaPago(credito.anticipoPago)}</span>
+                      {credito.anticipoPago.metodo === 'comprobante' && (
+                        <button onClick={() => verComprobante(credito, 0)} className="text-primary hover:underline">Ver comprobante</button>
+                      )}
+                    </>
+                  ) : (
+                    <button onClick={() => setCobro({ credito, numero: 0, titulo: 'Cobrar anticipo' })} className="text-primary hover:underline">Registrar cobro</button>
+                  )}
+                </div>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {credito.cuotas.map((cuota) => {
+                  const pagada = cuota.estado === 'pagada';
+                  return (
+                    <div key={cuota.numero} className={`text-xs rounded px-2 py-2 border ${pagada ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-gray-300'}`}>
+                      <div className="font-medium">Cuota {cuota.numero}</div>
+                      <div>${cuota.monto.toLocaleString('es-AR')}</div>
+                      <div className="text-gray-500">Vence {new Date(cuota.vencimiento).toLocaleDateString('es-AR')}</div>
+                      {pagada ? (
+                        <>
+                          <div>Pagada{cuota.pago ? ` — ${etiquetaPago(cuota.pago)}` : ''}</div>
+                          {cuota.pago?.metodo === 'comprobante' && (
+                            <button onClick={() => verComprobante(credito, cuota.numero)} className="underline">Ver comprobante</button>
+                          )}
+                        </>
+                      ) : credito.estado === 'activo' ? (
+                        <button onClick={() => setCobro({ credito, numero: cuota.numero, titulo: `Cobrar cuota ${cuota.numero}` })} className="text-primary underline">Registrar cobro</button>
+                      ) : (
+                        <div className="text-gray-400">Pendiente</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
