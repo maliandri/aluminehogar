@@ -6,8 +6,6 @@ import {
   listarCreditos,
   aprobarCredito,
   rechazarCredito,
-  getPaymentSettings,
-  actualizarPaymentSettings,
 } from '@/services/api';
 import { useAdminSession } from '@/components/admin/AdminSession';
 import { puedeEditar } from '@/lib/permisos';
@@ -24,19 +22,16 @@ export default function CreditosPanel() {
   const puedeEditarCreditos = puedeEditar(role, 'creditos');
   const [creditos, setCreditos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [settings, setSettings] = useState(null);
-  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => { fetchAll(); }, []);
 
   const fetchAll = async () => {
     try {
       setLoading(true);
-      const [creditosData, settingsData] = await Promise.all([listarCreditos(), getPaymentSettings()]);
+      const creditosData = await listarCreditos();
       setCreditos(creditosData.creditos || []);
-      setSettings(settingsData.settings);
     } catch {
-      alert('Error al cargar creditos y configuracion');
+      alert('Error al cargar creditos');
     } finally {
       setLoading(false);
     }
@@ -61,20 +56,6 @@ export default function CreditosPanel() {
     }
   };
 
-  const handleGuardarSettings = async (e) => {
-    e.preventDefault();
-    setSavingSettings(true);
-    try {
-      const data = await actualizarPaymentSettings(settings);
-      setSettings(data.settings);
-      alert('Configuracion guardada');
-    } catch (e) {
-      alert(e.response?.data?.error || 'Error al guardar la configuracion');
-    } finally {
-      setSavingSettings(false);
-    }
-  };
-
   if (loading) return <div className="text-center py-12 text-gray-500">Cargando...</div>;
 
   const pendientes = creditos.filter(c => c.estado === 'pendiente_aprobacion');
@@ -82,41 +63,6 @@ export default function CreditosPanel() {
 
   return (
     <div className="space-y-6">
-      {puedeEditarCreditos && (
-      <div className="bg-white shadow rounded-lg p-6">
-        <h3 className="text-lg font-semibold mb-4">Configuracion de pagos</h3>
-        <form onSubmit={handleGuardarSettings} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Max. cuotas Mercado Pago</label>
-            <input type="number" min="1" max="24" value={settings?.maxCuotasMercadoPago ?? 12}
-              onChange={(e) => setSettings({ ...settings, maxCuotasMercadoPago: Number(e.target.value) })}
-              className="w-full border rounded px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Monto maximo de credito propio</label>
-            <input type="number" min="0" value={settings?.creditoMontoMaximo ?? 0}
-              onChange={(e) => setSettings({ ...settings, creditoMontoMaximo: Number(e.target.value) })}
-              className="w-full border rounded px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Cuotas maximas de credito propio</label>
-            <input type="number" min="1" max="24" value={settings?.creditoCuotasMaximo ?? 6}
-              onChange={(e) => setSettings({ ...settings, creditoCuotasMaximo: Number(e.target.value) })}
-              className="w-full border rounded px-3 py-2 text-sm" />
-          </div>
-          <div className="sm:col-span-3">
-            <button type="submit" disabled={savingSettings} className="bg-blue-600 text-white px-6 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400">
-              {savingSettings ? 'Guardando...' : 'Guardar configuracion'}
-            </button>
-          </div>
-        </form>
-        <p className="text-xs text-gray-500 mt-3">
-          Un vendedor puede otorgar credito propio libremente dentro de estos limites. Si pide un monto o
-          cantidad de cuotas mayor, el credito queda pendiente de tu aprobacion abajo.
-        </p>
-      </div>
-      )}
-
       {pendientes.length > 0 && (
         <div className="bg-white shadow rounded-lg p-6">
           <h3 className="text-lg font-semibold mb-4">Pendientes de aprobacion ({pendientes.length})</h3>

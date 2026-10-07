@@ -12,6 +12,8 @@ export const SECCIONES = [
 
 export const ITEMS = [
   { id: 'creditos', seccion: 'ventas', etiqueta: 'Créditos', icono: 'CreditCard', ruta: '/admin/ventas/creditos', roles: ['admin', 'vendedor'] },
+  { id: 'planes-credito', seccion: 'ventas', etiqueta: 'Planes de crédito propio', icono: 'Wallet', ruta: '/admin/ventas/planes-credito', roles: ['admin'] },
+  { id: 'mercado-pago', seccion: 'ventas', etiqueta: 'Mercado Pago', icono: 'CreditCard', ruta: '/admin/ventas/mercado-pago', roles: ['admin'] },
   { id: 'conversaciones', seccion: 'ventas', etiqueta: 'Conversaciones', icono: 'MessageSquare', ruta: '/admin/ventas/conversaciones', roles: ['admin'] },
   { id: 'productos', seccion: 'store', etiqueta: 'Productos', icono: 'Package', ruta: '/admin/store/productos', roles: ['admin', 'vendedor'] },
   { id: 'depositos', seccion: 'store', etiqueta: 'Depósitos', icono: 'Warehouse', ruta: '/admin/store/depositos', roles: ['admin', 'vendedor'] },
