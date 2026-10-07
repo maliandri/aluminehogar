@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { connectDB } from '@/lib/db';
 import CreditoVenta from '@/lib/models/CreditoVenta';
-import PaymentSettings from '@/lib/models/PaymentSettings';
+import Cliente from '@/lib/models/Cliente';
 import User from '@/lib/models/User';
 import Product from '@/lib/models/Product';
 import { extractTokenFromHeaders, verifyToken, requireRole } from '@/lib/auth-helpers';
+import { getCreditoConfig } from '@/lib/credito-config';
+import { calcularPlan, evaluarAprobacion, buscarPlan } from '@/lib/credito-calculo';
 
 async function ajustarStockDeposito(productos, depositoId, delta) {
   if (!depositoId) return;
@@ -35,19 +38,19 @@ function authenticate(request, roles) {
   return decoded;
 }
 
-function calcularCuotas(montoTotal, anticipo, cantidadCuotas) {
-  const montoFinanciado = montoTotal - anticipo;
-  const montoPorCuota = Math.round((montoFinanciado / cantidadCuotas) * 100) / 100;
-  const cuotas = [];
-  const hoy = new Date();
+async function nombreDe(userId) {
+  const u = await User.findById(userId).select('nombre email');
+  return u?.nombre || u?.email || '';
+}
 
-  for (let i = 1; i <= cantidadCuotas; i++) {
-    const vencimiento = new Date(hoy);
-    vencimiento.setMonth(vencimiento.getMonth() + i);
-    cuotas.push({ numero: i, monto: montoPorCuota, vencimiento, estado: 'pendiente', fechaPago: null });
-  }
-
-  return cuotas;
+function limpiarProductos(productos) {
+  if (!Array.isArray(productos)) return [];
+  return productos.slice(0, 100).map((i) => ({
+    productId: String(i?.productId || ''),
+    nombre: String(i?.nombre || '').slice(0, 200),
+    precio: Number(i?.precio) || 0,
+    cantidad: Math.max(1, parseInt(i?.cantidad, 10) || 1)
+  }));
 }
 
 // GET /api/creditos?action=list
@@ -74,40 +77,57 @@ export async function POST(request) {
 
     if (action === 'create') {
       const decoded = authenticate(request, ['vendedor', 'admin']);
+      const { clienteId, productos, montoTotal, anticipo, frecuencia, cantidadCuotas, depositoId } = body;
 
-      const { clienteNombre, clienteTelefono, clienteEmail, productos, montoTotal, anticipo, cantidadCuotas, depositoId } = body;
-
-      if (!clienteNombre || !montoTotal || !cantidadCuotas) {
-        return NextResponse.json({ error: 'Cliente, monto total y cantidad de cuotas son requeridos' }, { status: 400 });
+      if (!mongoose.isValidObjectId(clienteId)) {
+        return NextResponse.json({ error: 'Elegí un cliente' }, { status: 400 });
       }
-      if (cantidadCuotas < 1) {
-        return NextResponse.json({ error: 'La cantidad de cuotas debe ser al menos 1' }, { status: 400 });
-      }
-      if ((anticipo || 0) >= montoTotal) {
-        return NextResponse.json({ error: 'El anticipo no puede ser mayor o igual al monto total' }, { status: 400 });
+      const cliente = await Cliente.findById(clienteId);
+      // Un cliente ajeno se responde igual que uno inexistente
+      if (!cliente || (decoded.role !== 'admin' && (!decoded.userId || cliente.creadoPor?.userId !== decoded.userId))) {
+        return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
       }
 
-      const settings = await PaymentSettings.findById('default');
-      const montoMaximo = settings?.creditoMontoMaximo ?? Infinity;
-      const cuotasMaximo = settings?.creditoCuotasMaximo ?? Infinity;
+      // El plan sale de la tabla del admin: el vendedor solo elige uno activo, no puede inventar el recargo
+      const config = await getCreditoConfig();
+      const plan = buscarPlan(config.planes, frecuencia, cantidadCuotas);
+      if (!plan) {
+        return NextResponse.json({ error: 'Ese plan de cuotas no está habilitado' }, { status: 400 });
+      }
 
-      const excedeLimites = montoTotal > montoMaximo || cantidadCuotas > cuotasMaximo;
+      const total = Number(montoTotal);
+      const ant = Number(anticipo || 0);
+      const calculo = calcularPlan({ montoTotal: total, anticipo: ant, cantidadCuotas: plan.cuotas, frecuencia: plan.frecuencia, recargoPorcentaje: plan.recargo });
+      if (!calculo.ok) {
+        return NextResponse.json({ error: calculo.errores.join('. ') }, { status: 400 });
+      }
 
-      const vendedorUser = await User.findById(decoded.userId).select('nombre email');
+      const { requiere, motivo } = evaluarAprobacion({ montoTotal: total, plan, montoMaximoSinAprobacion: config.montoMaximoSinAprobacion });
+      const quien = { userId: decoded.userId, nombre: await nombreDe(decoded.userId) };
 
       const credito = new CreditoVenta({
-        clienteNombre,
-        clienteTelefono,
-        clienteEmail,
+        clienteId: cliente._id,
+        clienteNombre: cliente.nombre,
+        clienteTelefono: cliente.telefono,
+        clienteEmail: cliente.email,
         vendedorId: decoded.userId,
-        vendedorNombre: vendedorUser?.nombre || vendedorUser?.email || '',
+        vendedorNombre: quien.nombre,
+        cargadoPor: quien,
         depositoId: depositoId || null,
-        productos: productos || [],
-        montoTotal,
-        anticipo: anticipo || 0,
-        cantidadCuotas,
-        cuotas: calcularCuotas(montoTotal, anticipo || 0, cantidadCuotas),
-        estado: excedeLimites ? 'pendiente_aprobacion' : 'activo'
+        productos: limpiarProductos(productos),
+        montoTotal: total,
+        anticipo: ant,
+        anticipoPago: { estado: ant > 0 ? 'pendiente' : 'no_aplica' },
+        frecuencia: plan.frecuencia,
+        recargoPorcentaje: plan.recargo,
+        interes: calculo.interes,
+        totalCuotas: calculo.totalCuotas,
+        montoCuota: calculo.montoCuota,
+        cantidadCuotas: plan.cuotas,
+        cuotas: calculo.cuotas,
+        estado: requiere ? 'pendiente_aprobacion' : 'activo',
+        motivoAprobacion: motivo,
+        aprobadoPor: requiere ? undefined : { tipo: 'automatica', userId: quien.userId, nombre: quien.nombre, fecha: new Date() }
       });
       await credito.save();
 
@@ -151,7 +171,7 @@ export async function POST(request) {
     }
 
     if (action === 'aprobar' || action === 'rechazar') {
-      authenticate(request, ['admin']);
+      const decoded = authenticate(request, ['admin']);
       const { id } = body;
 
       if (!id) {
@@ -166,7 +186,13 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Este credito no esta pendiente de aprobacion' }, { status: 400 });
       }
 
+      const quien = { userId: decoded.userId, nombre: await nombreDe(decoded.userId) };
       credito.estado = action === 'aprobar' ? 'activo' : 'rechazado';
+      if (action === 'aprobar') {
+        credito.aprobadoPor = { tipo: 'admin', ...quien, fecha: new Date() };
+      } else {
+        credito.rechazadoPor = quien;
+      }
       await credito.save();
 
       if (action === 'rechazar') {
