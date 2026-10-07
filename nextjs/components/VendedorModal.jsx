@@ -379,9 +379,10 @@ function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
   const [depositoId, setDepositoId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [cargandoConfig, setCargandoConfig] = useState(true);
 
   useEffect(() => {
-    obtenerCreditoConfig().then((d) => setConfig(d.config)).catch(() => setError('No se pudieron cargar los planes de crédito'));
+    obtenerCreditoConfig().then((d) => setConfig(d.config)).catch(() => setError('No se pudieron cargar los planes de crédito')).finally(() => setCargandoConfig(false));
     listarDepositos().then((data) => {
       const virtuales = (data.depositos || []).filter(d => d.esVirtualVendedor && d.activo);
       setDepositos(virtuales);
@@ -389,7 +390,11 @@ function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
     }).catch(() => {});
   }, []);
 
-  const planes = (config?.planes || []).filter((p) => p.frecuencia === frecuencia).sort((a, b) => a.cuotas - b.cuotas);
+  const planesActivos = (config?.planes || []).filter((p) => p.activo !== false);
+  const frecuenciasDisponibles = ['diaria', 'semanal', 'mensual'].filter((f) => planesActivos.some((p) => p.frecuencia === f));
+  // Si la frecuencia elegida no tiene planes, se toma la primera disponible
+  const frec = frecuenciasDisponibles.includes(frecuencia) ? frecuencia : frecuenciasDisponibles[0];
+  const planes = planesActivos.filter((p) => p.frecuencia === frec).sort((a, b) => a.cuotas - b.cuotas);
   // Si el plan elegido ya no existe en esta frecuencia, se toma el primero disponible
   const plan = planes.find((p) => p.cuotas === Number(cuotas)) || planes[0] || null;
 
@@ -401,7 +406,6 @@ function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
   const aprobacion = plan && config
     ? evaluarAprobacion({ montoTotal, plan, montoMaximoSinAprobacion: config.montoMaximoSinAprobacion })
     : { requiere: false, motivo: '' };
-  const frecuenciasDisponibles = ['diaria', 'semanal', 'mensual'].filter((f) => (config?.planes || []).some((p) => p.frecuencia === f));
 
   const handleOtorgar = async () => {
     setError('');
@@ -453,15 +457,15 @@ function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
           <p className="text-xs text-gray-500 mt-1">Anticipo: ${anticipo.toLocaleString('es-AR')}</p>
         </div>
 
-        {!config ? (
+        {cargandoConfig ? (
           <p className="text-sm text-gray-500">Cargando planes...</p>
-        ) : frecuenciasDisponibles.length === 0 ? (
+        ) : !config ? null : frecuenciasDisponibles.length === 0 ? (
           <p className="text-sm text-red-600">No hay planes de crédito habilitados. Pedile al administrador que los cargue.</p>
         ) : (
           <>
             <div>
               <label className="block text-sm font-medium mb-1">Frecuencia de las cuotas</label>
-              <select value={frecuencia} onChange={(e) => { setFrecuencia(e.target.value); setCuotas(''); }} className="input-field">
+              <select value={frec} onChange={(e) => { setFrecuencia(e.target.value); setCuotas(''); }} className="input-field">
                 {frecuenciasDisponibles.map((f) => <option key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</option>)}
               </select>
             </div>
@@ -601,7 +605,7 @@ function MisCreditosTab({ isOpen }) {
                     <div key={cuota.numero} className={`text-xs rounded px-2 py-2 border ${pagada ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-gray-300'}`}>
                       <div className="font-medium">Cuota {cuota.numero}</div>
                       <div>${cuota.monto.toLocaleString('es-AR')}</div>
-                      <div className="text-gray-500">Vence {new Date(cuota.vencimiento).toLocaleDateString('es-AR')}</div>
+                      <div className="text-gray-500">Vence {cuota.vencimiento ? new Date(cuota.vencimiento).toLocaleDateString('es-AR') : '-'}</div>
                       {pagada ? (
                         <>
                           <div>Pagada{cuota.pago ? ` — ${etiquetaPago(cuota.pago)}` : ''}</div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { archivoADataUrl } from '@/lib/leer-archivo';
 
@@ -11,6 +11,12 @@ export default function CobroDialog({ titulo, onConfirmar, onCancelar }) {
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState(null);
   const input = useRef(null);
+
+  useEffect(() => {
+    const alTeclear = (e) => { if (e.key === 'Escape' && !procesando) onCancelar(); };
+    document.addEventListener('keydown', alTeclear);
+    return () => document.removeEventListener('keydown', alTeclear);
+  }, [procesando, onCancelar]);
 
   const confirmar = async () => {
     setError(null);
@@ -30,7 +36,7 @@ export default function CobroDialog({ titulo, onConfirmar, onCancelar }) {
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-5 space-y-4" role="dialog" aria-label={titulo}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-5 space-y-4" role="dialog" aria-modal="true" aria-label={titulo}>
         <h3 className="text-lg font-semibold">{titulo}</h3>
 
         <label className="flex items-start gap-2 text-sm">
@@ -39,7 +45,7 @@ export default function CobroDialog({ titulo, onConfirmar, onCancelar }) {
         </label>
         {metodo === 'comprobante' && (
           <div className="ml-6">
-            <input ref={input} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(e) => setArchivo(e.target.files?.[0] || null)} className="text-sm" />
+            <input ref={input} type="file" aria-label="Archivo del comprobante" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(e) => setArchivo(e.target.files?.[0] || null)} className="text-sm" />
           </div>
         )}
         <label className="flex items-start gap-2 text-sm">
