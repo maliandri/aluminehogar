@@ -374,7 +374,7 @@ function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
   const [config, setConfig] = useState(null);
   const [frecuencia, setFrecuencia] = useState('mensual');
   const [cuotas, setCuotas] = useState('');
-  const [anticipoPorcentaje, setAnticipoPorcentaje] = useState(20);
+  const [entregaElegida, setEntregaElegida] = useState('');
   const [depositos, setDepositos] = useState([]);
   const [depositoId, setDepositoId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -406,10 +406,11 @@ function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
   const plan = planes.find((p) => p.cuotas === Number(cuotas)) || planes[0] || null;
 
   const montoTotal = calcularTotal();
-  const anticipo = Math.round(montoTotal * (anticipoPorcentaje / 100));
-  const calculo = plan
-    ? calcularPlan({ montoTotal, anticipo, cantidadCuotas: plan.cuotas, frecuencia: plan.frecuencia, recargoPorcentaje: plan.recargo })
-    : null;
+  // La entrega del plan es el mínimo; si el vendedor escribe un monto mayor, se usa ese
+  const entregaNum = entregaElegida.trim() === '' ? undefined : Number(entregaElegida);
+  const baseCalculo = plan ? { montoTotal, entregaPorcentaje: plan.entrega, tasaPorcentaje: plan.tasa, cantidadCuotas: plan.cuotas, frecuencia: plan.frecuencia } : null;
+  const entregaMinima = baseCalculo ? calcularPlan(baseCalculo).anticipo ?? 0 : 0;
+  const calculo = baseCalculo ? calcularPlan({ ...baseCalculo, anticipo: entregaNum }) : null;
   const aprobacion = plan && config
     ? evaluarAprobacion({ montoTotal, plan, montoMaximoSinAprobacion: config.montoMaximoSinAprobacion })
     : { requiere: false, motivo: '' };
@@ -428,7 +429,7 @@ function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
         depositoId: depositoId || null,
         productos: items.map(i => ({ productId: i._id, nombre: i.nombre, precio: i.precio, cantidad: i.cantidad })),
         montoTotal,
-        anticipo,
+        anticipo: entregaNum,
         frecuencia: plan.frecuencia,
         cantidadCuotas: plan.cuotas
       });
@@ -457,12 +458,6 @@ function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
           <span>Monto total (segun presupuesto)</span>
           <span className="font-bold">${montoTotal.toLocaleString('es-AR')}</span>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Anticipo (%)</label>
-          <input type="number" min="0" max="90" value={anticipoPorcentaje}
-            onChange={(e) => setAnticipoPorcentaje(Number(e.target.value))} className="input-field" />
-          <p className="text-xs text-gray-500 mt-1">Anticipo: ${anticipo.toLocaleString('es-AR')}</p>
-        </div>
 
         {cargandoConfig ? (
           <p className="text-sm text-gray-500">Cargando planes...</p>
@@ -484,13 +479,22 @@ function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
             <div>
               <label className="block text-sm font-medium mb-1">Plan</label>
               <select value={plan?.cuotas ?? ''} onChange={(e) => setCuotas(e.target.value)} className="input-field">
-                {planes.map((p) => <option key={p.cuotas} value={p.cuotas}>{p.cuotas} {p.cuotas === 1 ? 'cuota' : 'cuotas'} {p.recargo > 0 ? `(+${p.recargo}%)` : '(sin recargo)'}</option>)}
+                {planes.map((p) => <option key={p.cuotas} value={p.cuotas}>{p.cuotas} {p.cuotas === 1 ? 'cuota' : 'cuotas'} (entrega {p.entrega}%, interés {p.tasa}% {{ diaria: 'por día', semanal: 'por semana', mensual: 'por mes' }[p.frecuencia]})</option>)}
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Entrega ($)</label>
+              <input type="number" min={entregaMinima} value={entregaElegida} placeholder={String(entregaMinima)}
+                onChange={(e) => setEntregaElegida(e.target.value)} className="input-field" />
+              <p className="text-xs text-gray-500 mt-1">Mínimo del plan: ${entregaMinima.toLocaleString('es-AR')}. Si el cliente entrega más, escribí el monto.</p>
             </div>
             {calculo?.ok && (
               <div className="text-sm bg-white rounded p-3 border space-y-1">
+                <div className="flex justify-between"><span>Entrega</span><span>${calculo.anticipo.toLocaleString('es-AR')}</span></div>
                 <div className="flex justify-between"><span>Saldo a financiar</span><span>${calculo.montoFinanciado.toLocaleString('es-AR')}</span></div>
-                <div className="flex justify-between"><span>Recargo</span><span>${calculo.interes.toLocaleString('es-AR')}</span></div>
+                <div className="flex justify-between text-gray-600"><span>Cada cuota: capital</span><span>${calculo.capitalCuota.toLocaleString('es-AR')}</span></div>
+                <div className="flex justify-between text-gray-600"><span>Cada cuota: interés ({plan.tasa}%)</span><span>${calculo.interesPorCuota.toLocaleString('es-AR')}</span></div>
+                <div className="flex justify-between"><span>Interés total</span><span>${calculo.interes.toLocaleString('es-AR')}</span></div>
                 <div className="flex justify-between font-semibold"><span>{plan.cuotas} cuotas de</span><span>${calculo.montoCuota.toLocaleString('es-AR')}</span></div>
                 <div className="flex justify-between text-gray-500"><span>Total final</span><span>${calculo.totalFinal.toLocaleString('es-AR')}</span></div>
               </div>

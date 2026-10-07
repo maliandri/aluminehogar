@@ -1,7 +1,7 @@
 import { connectDB } from '@/lib/db';
 import CreditoConfig from '@/lib/models/CreditoConfig';
 import PaymentSettings from '@/lib/models/PaymentSettings';
-import { planesDeFabrica } from '@/lib/credito-calculo';
+import { planesDeFabrica, normalizarPlan } from '@/lib/credito-calculo';
 
 // Lee la configuración del crédito propio. La primera vez la siembra con lo que había en PaymentSettings
 // (monto máximo y cuotas máximas) para que el comportamiento de hoy no cambie. Sin caché: es de uso interno.
@@ -21,5 +21,5 @@ export async function getCreditoConfig() {
       { upsert: true, new: true }
     ).lean();
   }
-  return { montoMaximoSinAprobacion: doc.montoMaximoSinAprobacion, planes: doc.planes || [] };
+  return { montoMaximoSinAprobacion: doc.montoMaximoSinAprobacion, planes: (doc.planes || []).map(normalizarPlan) };
 }

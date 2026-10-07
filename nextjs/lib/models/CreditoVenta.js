@@ -62,6 +62,10 @@ const CreditoVentaSchema = new mongoose.Schema({
   // Plan elegido (créditos viejos: sin frecuencia, se consideran mensuales sin recargo)
   frecuencia: { type: String, enum: ['diaria', 'semanal', 'mensual'], default: 'mensual' },
   recargoPorcentaje: { type: Number, default: 0 },
+  entregaPorcentaje: { type: Number, default: 0 },
+  tasaPorcentaje: { type: Number, default: 0 },
+  capitalCuota: { type: Number },
+  interesCuota: { type: Number },
   interes: { type: Number, default: 0 },
   totalCuotas: { type: Number },
   montoCuota: { type: Number },

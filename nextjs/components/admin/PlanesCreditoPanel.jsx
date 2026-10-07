@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { calcularPlan } from '@/lib/credito-calculo';
 import { obtenerCreditoConfig, guardarCreditoConfig } from '@/services/api';
 
 const FRECUENCIAS = [
-  { id: 'diaria', titulo: 'Cuotas diarias', unidad: 'días', agregar: 'Agregar plan diario' },
-  { id: 'semanal', titulo: 'Cuotas semanales', unidad: 'semanas', agregar: 'Agregar plan semanal' },
-  { id: 'mensual', titulo: 'Cuotas mensuales', unidad: 'meses', agregar: 'Agregar plan mensual' },
+  { id: 'diaria', titulo: 'Cuotas diarias', unidad: 'días', por: 'por día', agregar: 'Agregar plan diario' },
+  { id: 'semanal', titulo: 'Cuotas semanales', unidad: 'semanas', por: 'por semana', agregar: 'Agregar plan semanal' },
+  { id: 'mensual', titulo: 'Cuotas mensuales', unidad: 'meses', por: 'por mes', agregar: 'Agregar plan mensual' },
 ];
 
 export default function PlanesCreditoPanel() {
@@ -29,7 +30,7 @@ export default function PlanesCreditoPanel() {
   const cambiar = (indice, parche) => setPlanes((prev) => prev.map((p, i) => (i === indice ? { ...p, ...parche } : p)));
   const quitar = (indice) => setPlanes((prev) => prev.filter((_, i) => i !== indice));
   const agregar = (frecuencia) =>
-    setPlanes((prev) => [...prev, { frecuencia, cuotas: 1, recargo: 0, requiereAprobacion: false, activo: true }]);
+    setPlanes((prev) => [...prev, { frecuencia, cuotas: 1, entrega: 0, tasa: 0, requiereAprobacion: false, activo: true }]);
 
   const handleGuardar = async () => {
     const montoNum = Number(monto);
@@ -63,7 +64,7 @@ export default function PlanesCreditoPanel() {
       <div>
         <h2 className="text-2xl font-bold">Planes de crédito propio</h2>
         <p className="text-sm text-gray-500">
-          El vendedor elige uno de estos planes al otorgar un crédito. El recargo se suma al saldo (total menos anticipo) y se divide en cuotas iguales.
+          El vendedor elige uno de estos planes al otorgar un crédito. Cada plan tiene una entrega mínima (% del total) y un interés por período (por día, semana o mes) que se calcula sobre el saldo (total menos entrega). Cada cuota es capital + interés. El vendedor puede pedir más entrega si el cliente quiere dar más.
         </p>
       </div>
 
@@ -87,9 +88,15 @@ export default function PlanesCreditoPanel() {
                   className="border rounded px-2 py-1.5 w-24 ml-2" />
               </label>
               <label className="text-sm">
-                Recargo (%)
-                <input type="number" min="0" max="300" step="0.1" value={p.recargo}
-                  onChange={(e) => cambiar(indice, { recargo: e.target.value === '' ? '' : Number(e.target.value) })}
+                Entrega mínima (%)
+                <input type="number" min="0" max="90" step="0.1" value={p.entrega}
+                  onChange={(e) => cambiar(indice, { entrega: e.target.value === '' ? '' : Number(e.target.value) })}
+                  className="border rounded px-2 py-1.5 w-24 ml-2" />
+              </label>
+              <label className="text-sm">
+                Interés {f.por} (%)
+                <input type="number" min="0" max="100" step="0.1" value={p.tasa}
+                  onChange={(e) => cambiar(indice, { tasa: e.target.value === '' ? '' : Number(e.target.value) })}
                   className="border rounded px-2 py-1.5 w-24 ml-2" />
               </label>
               <label className="text-sm flex items-center gap-1">
@@ -102,6 +109,7 @@ export default function PlanesCreditoPanel() {
               </label>
               <button type="button" aria-label={`Quitar plan ${p.frecuencia} de ${p.cuotas} cuotas`} onClick={() => quitar(indice)}
                 className="ml-auto p-1.5 rounded border text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
+              <EjemploPlan plan={p} unidad={f.unidad} />
             </div>
           ))}
           <button type="button" onClick={() => agregar(f.id)}
@@ -124,6 +132,22 @@ export default function PlanesCreditoPanel() {
         {guardando && <Loader2 className="w-4 h-4 animate-spin" />}
         {guardando ? 'Guardando...' : 'Guardar planes'}
       </button>
+    </div>
+  );
+}
+
+const plata = (n) => `$${n.toLocaleString('es-AR')}`;
+
+// Cómo impacta el plan sobre una venta de $100.000
+function EjemploPlan({ plan, unidad }) {
+  const c = calcularPlan({ montoTotal: 100000, entregaPorcentaje: plan.entrega, tasaPorcentaje: plan.tasa, cantidadCuotas: plan.cuotas, frecuencia: plan.frecuencia });
+  if (!c.ok) return <p className="w-full text-xs text-gray-400">Completá los datos del plan para ver el ejemplo.</p>;
+  return (
+    <div className="w-full text-xs bg-gray-50 border rounded p-3 text-gray-700 space-y-0.5">
+      <p className="font-semibold">Ejemplo con una venta de $100.000 en {plan.cuotas} {unidad}</p>
+      <p>Entrega: {plata(c.anticipo)} — saldo a financiar: {plata(c.montoFinanciado)}</p>
+      <p>Cada cuota: {plata(c.capitalCuota)} de capital + {plata(c.interesPorCuota)} de interés = <strong>{plata(c.montoCuota)}</strong></p>
+      <p>Interés total: {plata(c.interes)} — el cliente paga en total <strong>{plata(c.totalFinal)}</strong></p>
     </div>
   );
 }

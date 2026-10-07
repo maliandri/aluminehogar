@@ -25,24 +25,33 @@ export function sumarPeriodo(fecha, frecuencia, n) {
   return d;
 }
 
-// recargo% sobre el saldo financiado (total − anticipo); cuotas iguales al centavo y la última absorbe la diferencia
+// La entrega mínima es un % del total (el vendedor puede pedir más con `anticipo`); el saldo (total − entrega) se divide en cuotas de capital iguales y a cada cuota
+// se le suma el interés fijo: tasa% por período sobre el saldo financiado. La última cuota absorbe los centavos.
 export function calcularPlan(entrada) {
   if (!entrada || typeof entrada !== 'object') return { ok: false, errores: ['Datos del plan inválidos'] };
-  const { montoTotal, anticipo = 0, cantidadCuotas, frecuencia, recargoPorcentaje = 0, desde = new Date() } = entrada;
+  const { montoTotal, entregaPorcentaje = 0, tasaPorcentaje = 0, cantidadCuotas, frecuencia, anticipo: anticipoPedido, desde = new Date() } = entrada;
   const errores = [];
   if (!esNumero(montoTotal) || montoTotal <= 0) errores.push('El monto total tiene que ser mayor a 0');
   else if (montoTotal > 1e9) errores.push('El monto total es demasiado grande');
-  if (!esNumero(anticipo) || anticipo < 0) errores.push('El anticipo no es válido');
-  if (esNumero(montoTotal) && esNumero(anticipo) && anticipo >= montoTotal) errores.push('El anticipo tiene que ser menor al monto total');
+  if (!esNumero(entregaPorcentaje) || entregaPorcentaje < 0 || entregaPorcentaje > 90) errores.push('La entrega no es válida');
   if (!Number.isInteger(cantidadCuotas) || cantidadCuotas < 1 || cantidadCuotas > 365) errores.push('La cantidad de cuotas no es válida');
   if (!FRECUENCIAS.includes(frecuencia)) errores.push('La frecuencia no es válida');
-  if (!esNumero(recargoPorcentaje) || recargoPorcentaje < 0 || recargoPorcentaje > 300) errores.push('El recargo no es válido');
+  if (!esNumero(tasaPorcentaje) || tasaPorcentaje < 0 || tasaPorcentaje > 100) errores.push('La tasa de interés no es válida');
+  const anticipoMinimo = errores.length ? 0 : redondear((montoTotal * entregaPorcentaje) / 100);
+  if (anticipoPedido !== undefined && anticipoPedido !== null) {
+    if (!esNumero(anticipoPedido) || anticipoPedido < 0) errores.push('La entrega no es válida');
+    else if (anticipoPedido < anticipoMinimo) errores.push(`La entrega mínima de este plan es $${anticipoMinimo.toLocaleString('es-AR')}`);
+    else if (esNumero(montoTotal) && anticipoPedido >= montoTotal) errores.push('La entrega tiene que ser menor al monto total');
+  }
   if (errores.length) return { ok: false, errores };
 
+  const anticipo = anticipoPedido === undefined || anticipoPedido === null ? anticipoMinimo : redondear(anticipoPedido);
   const montoFinanciado = redondear(montoTotal - anticipo);
-  const interes = redondear((montoFinanciado * recargoPorcentaje) / 100);
+  const interesPorCuota = redondear((montoFinanciado * tasaPorcentaje) / 100);
+  const interes = redondear(interesPorCuota * cantidadCuotas);
   const totalCuotas = redondear(montoFinanciado + interes);
-  const montoCuota = Math.floor((totalCuotas / cantidadCuotas) * 100) / 100;
+  const capitalCuota = Math.floor((montoFinanciado / cantidadCuotas) * 100) / 100;
+  const montoCuota = redondear(capitalCuota + interesPorCuota);
   if (montoCuota < 0.01) return { ok: false, errores: ['El monto es muy chico para esa cantidad de cuotas'] };
 
   const cuotas = [];
@@ -52,7 +61,20 @@ export function calcularPlan(entrada) {
     acumulado = redondear(acumulado + monto);
     cuotas.push({ numero: i, monto, vencimiento: sumarPeriodo(desde, frecuencia, i), estado: 'pendiente', fechaPago: null });
   }
-  return { ok: true, errores: [], montoFinanciado, interes, totalCuotas, totalFinal: redondear(anticipo + totalCuotas), montoCuota, cuotas };
+  return {
+    ok: true, errores: [], anticipo, anticipoMinimo, montoFinanciado, capitalCuota, interesPorCuota, interes, totalCuotas,
+    totalFinal: redondear(anticipo + totalCuotas), montoCuota, cuotas
+  };
+}
+
+// Planes guardados antes de este cambio tenían un "recargo" total sin entrega: se reparte como tasa por período
+export function normalizarPlan(p) {
+  if (!p || typeof p !== 'object') return p;
+  const { recargo, ...resto } = p;
+  if (typeof resto.tasa === 'number') return { ...resto, entrega: typeof resto.entrega === 'number' ? resto.entrega : 0 };
+  const total = typeof recargo === 'number' ? recargo : 0;
+  const n = Number.isInteger(resto.cuotas) && resto.cuotas > 0 ? resto.cuotas : 1;
+  return { ...resto, entrega: 0, tasa: redondear(total / n) };
 }
 
 // Un crédito necesita aprobación del admin si supera el monto máximo o si el plan lo exige
@@ -72,13 +94,13 @@ export function buscarPlan(planes, frecuencia, cuotas) {
   const n = Number(cuotas);
   if (!Number.isInteger(n)) return null;
   const plan = planes.find((p) => p && p.frecuencia === frecuencia && p.cuotas === n);
-  return plan && plan.activo === true ? plan : null;
+  return plan && plan.activo === true ? normalizarPlan(plan) : null;
 }
 
 // Planes mensuales de 1 a N cuotas sin recargo: reproducen el comportamiento anterior (cuotas máximas del admin)
 export function planesDeFabrica(cuotasMaximo) {
   const n = Math.min(24, Math.max(1, Math.floor(Number(cuotasMaximo) || 1)));
-  return Array.from({ length: n }, (_, i) => ({ frecuencia: 'mensual', cuotas: i + 1, recargo: 0, requiereAprobacion: false, activo: true }));
+  return Array.from({ length: n }, (_, i) => ({ frecuencia: 'mensual', cuotas: i + 1, entrega: 0, tasa: 0, requiereAprobacion: false, activo: true }));
 }
 
 // Valida y limpia la tabla de planes que manda el admin
@@ -101,12 +123,14 @@ export function validarCreditoConfig(entrada) {
     }
     if (!FRECUENCIAS.includes(p.frecuencia)) errores.push(`${nombre}: la frecuencia no es válida`);
     if (!Number.isInteger(p.cuotas) || p.cuotas < 1 || p.cuotas > 365) errores.push(`${nombre}: la cantidad de cuotas tiene que ser un número entero entre 1 y 365`);
-    if (!esNumero(p.recargo) || p.recargo < 0 || p.recargo > 300) errores.push(`${nombre}: el recargo tiene que estar entre 0 y 300`);
+    const q = normalizarPlan(p);
+    if (!esNumero(q.entrega) || q.entrega < 0 || q.entrega > 90) errores.push(`${nombre}: la entrega tiene que estar entre 0 y 90`);
+    if (!esNumero(q.tasa) || q.tasa < 0 || q.tasa > 100) errores.push(`${nombre}: la tasa de interés tiene que estar entre 0 y 100`);
     if (typeof p.requiereAprobacion !== 'boolean' || typeof p.activo !== 'boolean') errores.push(`${nombre}: "requiere aprobación" y "activo" tienen que ser sí o no`);
     const clave = `${p.frecuencia}:${p.cuotas}`;
     if (vistos.has(clave)) errores.push(`${nombre}: ya hay un plan ${p.frecuencia} de ${p.cuotas} cuotas`);
     vistos.add(clave);
-    planes.push({ frecuencia: p.frecuencia, cuotas: p.cuotas, recargo: redondear(p.recargo), requiereAprobacion: p.requiereAprobacion === true, activo: p.activo === true });
+    planes.push({ frecuencia: p.frecuencia, cuotas: p.cuotas, entrega: redondear(q.entrega), tasa: redondear(q.tasa), requiereAprobacion: p.requiereAprobacion === true, activo: p.activo === true });
   });
 
   return errores.length

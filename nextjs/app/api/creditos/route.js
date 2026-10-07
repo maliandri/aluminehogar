@@ -133,7 +133,7 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
       }
 
-      // El plan sale de la tabla del admin: el vendedor solo elige uno activo, no puede inventar el recargo
+      // El plan sale de la tabla del admin: el vendedor solo elige uno activo, no puede inventar la tasa
       const config = await getCreditoConfig();
       const plan = buscarPlan(config.planes, frecuencia, cantidadCuotas);
       if (!plan) {
@@ -141,8 +141,15 @@ export async function POST(request) {
       }
 
       const total = Number(montoTotal);
-      const ant = Number(anticipo || 0);
-      const calculo = calcularPlan({ montoTotal: total, anticipo: ant, cantidadCuotas: plan.cuotas, frecuencia: plan.frecuencia, recargoPorcentaje: plan.recargo });
+      // La entrega del plan es el mínimo; si el vendedor manda una mayor (el cliente quiere dar más), se respeta
+      const calculo = calcularPlan({
+        montoTotal: total,
+        entregaPorcentaje: plan.entrega,
+        tasaPorcentaje: plan.tasa,
+        anticipo: anticipo === undefined || anticipo === null || anticipo === '' ? undefined : Number(anticipo),
+        cantidadCuotas: plan.cuotas,
+        frecuencia: plan.frecuencia
+      });
       if (!calculo.ok) {
         return NextResponse.json({ error: calculo.errores.join('. ') }, { status: 400 });
       }
@@ -161,10 +168,15 @@ export async function POST(request) {
         depositoId: deposito,
         productos: limpiarProductos(productos),
         montoTotal: total,
-        anticipo: ant,
-        anticipoPago: { estado: ant > 0 ? 'pendiente' : 'no_aplica' },
+        anticipo: calculo.anticipo,
+        anticipoPago: { estado: calculo.anticipo > 0 ? 'pendiente' : 'no_aplica' },
         frecuencia: plan.frecuencia,
-        recargoPorcentaje: plan.recargo,
+        // % total de recargo sobre el saldo, para mostrar en los listados
+        recargoPorcentaje: calculo.montoFinanciado > 0 ? Math.round((calculo.interes / calculo.montoFinanciado) * 10000) / 100 : 0,
+        entregaPorcentaje: plan.entrega,
+        tasaPorcentaje: plan.tasa,
+        capitalCuota: calculo.capitalCuota,
+        interesCuota: calculo.interesPorCuota,
         interes: calculo.interes,
         totalCuotas: calculo.totalCuotas,
         montoCuota: calculo.montoCuota,
