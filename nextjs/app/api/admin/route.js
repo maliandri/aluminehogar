@@ -219,7 +219,7 @@ export async function POST(request) {
           continue;
         }
 
-        const result = await collection.updateOne({ _id: String(id) }, { $set: { stock } });
+        const result = await collection.updateOne({ _id: String(id) }, { $set: { stock, updatedAt: new Date() } });
         if (result.matchedCount > 0) actualizados++;
         else errores.push(`Producto no encontrado: ${id}`);
       }
@@ -362,7 +362,8 @@ export async function POST(request) {
                 mostrar: 'no',
                 stock: unidades,
                 stockPorDeposito: deposito && unidades > 0 ? [{ depositoId: String(deposito._id), cantidad: unidades }] : [],
-                createdAt: new Date()
+                createdAt: new Date(),
+                updatedAt: new Date()
               }
             },
             upsert: true
@@ -460,7 +461,7 @@ export async function PATCH(request) {
       if (body.mostrar !== 'si' && body.mostrar !== 'no') {
         return NextResponse.json({ error: 'Valor invalido' }, { status: 400 });
       }
-      const result = await Product.db.collection('productos').updateOne({ _id: id }, { $set: { mostrar: body.mostrar } });
+      const result = await Product.db.collection('productos').updateOne({ _id: id }, { $set: { mostrar: body.mostrar, updatedAt: new Date() } });
       if (!result.matchedCount) {
         return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 });
       }
@@ -478,7 +479,7 @@ export async function PATCH(request) {
           cantidad: Math.max(0, parseInt(d.cantidad) || 0)
         }));
         const stockTotal = stockPorDeposito.reduce((sum, d) => sum + d.cantidad, 0);
-        await collection.updateOne({ _id: id }, { $set: { stockPorDeposito, stock: stockTotal } });
+        await collection.updateOne({ _id: id }, { $set: { stockPorDeposito, stock: stockTotal, updatedAt: new Date() } });
         return NextResponse.json({ success: true, stock: stockTotal, stockPorDeposito });
       }
 
@@ -486,7 +487,7 @@ export async function PATCH(request) {
       if (stock === undefined || isNaN(stock) || stock < 0) {
         return NextResponse.json({ error: 'Stock invalido' }, { status: 400 });
       }
-      await collection.updateOne({ _id: id }, { $set: { stock: parseInt(stock) } });
+      await collection.updateOne({ _id: id }, { $set: { stock: parseInt(stock), updatedAt: new Date() } });
       return NextResponse.json({ success: true, stock: parseInt(stock) });
     }
 
@@ -544,6 +545,9 @@ export async function PUT(request) {
     await connectDB();
     const updates = await request.json();
     delete updates._id;
+    // Las fechas las pone el servidor, no el formulario
+    delete updates.createdAt;
+    delete updates.updatedAt;
 
     const productoActualizado = await Product.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
 

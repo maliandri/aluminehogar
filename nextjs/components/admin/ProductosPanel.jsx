@@ -14,6 +14,14 @@ import ProductForm from './ProductForm';
 import { useAdminSession } from '@/components/admin/AdminSession';
 import { puedeEditar } from '@/lib/permisos';
 
+// Los productos cargados antes de que se guardaran las fechas no la tienen
+const formatearFecha = (valor) => {
+  if (!valor) return '—';
+  const d = new Date(valor);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
 export default function ProductosPanel() {
   const { role } = useAdminSession();
   const puedeEditarProductos = puedeEditar(role, 'productos');
@@ -74,6 +82,10 @@ export default function ProductosPanel() {
             return ((a.stock || 0) - (b.stock || 0)) * dir;
           case 'mostrar':
             return (a.mostrar || '').localeCompare(b.mostrar || '') * dir;
+          case 'creado':
+            return (new Date(a.createdAt || 0) - new Date(b.createdAt || 0)) * dir;
+          case 'modificado':
+            return (new Date(a.updatedAt || 0) - new Date(b.updatedAt || 0)) * dir;
           case 'descripcion':
             const aHasDesc = !!(a.descripcion);
             const bHasDesc = !!(b.descripcion);
@@ -279,6 +291,12 @@ export default function ProductosPanel() {
               <th onClick={() => handleSort('descripcion')} className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none">
                 <span className="flex items-center gap-1">Desc. <SortIcon column="descripcion" /></span>
               </th>
+              <th onClick={() => handleSort('creado')} className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none">
+                <span className="flex items-center gap-1">Creado <SortIcon column="creado" /></span>
+              </th>
+              <th onClick={() => handleSort('modificado')} className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none">
+                <span className="flex items-center gap-1">Modificado <SortIcon column="modificado" /></span>
+              </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Acciones</th>
             </tr>
           </thead>
@@ -375,6 +393,8 @@ export default function ProductosPanel() {
                     {producto.descripcion ? 'Si' : 'No'}
                   </span>
                 </td>
+                <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{formatearFecha(producto.createdAt)}</td>
+                <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{formatearFecha(producto.updatedAt)}</td>
                 <td className="px-4 py-3 text-right space-x-2">
                   {puedeEditarProductos && (<>
                   <button onClick={() => handleEdit(producto)} className="text-blue-600 hover:text-blue-800 text-sm">Editar</button>

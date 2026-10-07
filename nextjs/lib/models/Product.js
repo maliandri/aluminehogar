@@ -15,6 +15,6 @@ const ProductSchema = new mongoose.Schema({
     depositoId: String,
     cantidad: { type: Number, default: 0 }
   }]
-}, { strict: false, collection: 'productos' });
+}, { strict: false, collection: 'productos', timestamps: true });
 
 export default mongoose.models.Product || mongoose.model('Product', ProductSchema);
