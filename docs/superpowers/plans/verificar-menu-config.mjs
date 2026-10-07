@@ -19,7 +19,7 @@ const ids = (menu, rol) => resolverMenu(menu, rol).flatMap((s) => s.items.map((i
 t('el menú de fábrica es válido', () => assert.equal(validarMenu(menuDeFabrica()).ok, true));
 t('normalizar(null) es el menú de fábrica', () => assert.deepEqual(normalizarMenu(null), menuDeFabrica()));
 t('admin ve todas las pantallas', () => assert.equal(ids(menuDeFabrica(), 'admin').length, ITEMS.length));
-t('vendedor ve solo créditos, productos y depósitos', () => assert.deepEqual(ids(menuDeFabrica(), 'vendedor').sort(), ['creditos', 'depositos', 'productos']));
+t('vendedor ve solo clientes, créditos, productos y depósitos', () => assert.deepEqual(ids(menuDeFabrica(), 'vendedor').sort(), ['clientes', 'creditos', 'depositos', 'productos']));
 t('cliente no ve nada', () => assert.deepEqual(resolverMenu(menuDeFabrica(), 'customer'), []));
 t('resolver trae ruta e ícono del catálogo', () => {
   const p = resolverMenu(menuDeFabrica(), 'admin').flatMap((s) => s.items).find((i) => i.id === 'productos');

@@ -9,6 +9,7 @@ import {
   crearInvitacion,
   listarInvitaciones,
   revocarInvitacion,
+  listarClientes,
 } from '@/services/api';
 
 const ROLE_LABELS_INVITACION = { customer: 'Cliente', vendedor: 'Vendedor', admin: 'Admin' };
@@ -108,6 +109,53 @@ function InvitationsBlock() {
   );
 }
 
+function ClientesDeVendedoresBlock() {
+  const [clientes, setClientes] = useState([]);
+  const [q, setQ] = useState('');
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    const espera = setTimeout(() => {
+      setCargando(true);
+      listarClientes(q)
+        .then((data) => setClientes(data.clientes || []))
+        .catch(() => setClientes([]))
+        .finally(() => setCargando(false));
+    }, 300);
+    return () => clearTimeout(espera);
+  }, [q]);
+
+  return (
+    <div className="bg-white shadow rounded-lg p-6 space-y-3">
+      <h3 className="text-lg font-semibold">Clientes cargados por vendedores</h3>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre, documento o teléfono"
+        className="w-full border rounded px-3 py-2 text-sm" />
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead className="text-left text-xs uppercase text-gray-600">
+            <tr><th className="py-2 pr-4">Cliente</th><th className="py-2 pr-4">Documento</th><th className="py-2 pr-4">Teléfono</th><th className="py-2 pr-4">Email</th><th className="py-2">Cargado por</th></tr>
+          </thead>
+          <tbody className="divide-y">
+            {clientes.map((c) => (
+              <tr key={c._id}>
+                <td className="py-2 pr-4">
+                  {c.nombre}{' '}
+                  <span className="ml-1 px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700">Cliente creado por vendedor</span>
+                </td>
+                <td className="py-2 pr-4">{c.tipoDocumento} {c.numeroDocumento}</td>
+                <td className="py-2 pr-4">{c.telefono}</td>
+                <td className="py-2 pr-4 max-w-[14rem] truncate" title={c.email}>{c.email}</td>
+                <td className="py-2">{c.creadoPor?.nombre || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!cargando && clientes.length === 0 && <p className="text-sm text-gray-500 py-4">No hay clientes cargados por vendedores.</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function UsersPanel({ currentUserId }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -193,6 +241,7 @@ export default function UsersPanel({ currentUserId }) {
   return (
     <>
       <InvitationsBlock />
+      <ClientesDeVendedoresBlock />
 
       <div className="bg-white shadow rounded-lg p-4 mb-4">
         <div className="flex gap-3">
