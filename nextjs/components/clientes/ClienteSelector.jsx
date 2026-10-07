@@ -13,10 +13,14 @@ export default function ClienteSelector({ value, onChange }) {
 
   useEffect(() => {
     if (value || creando) return undefined;
+    let cancelado = false;
     const espera = setTimeout(() => {
-      listarClientes(q).then((d) => setResultados((d.clientes || []).slice(0, 8))).catch(() => setResultados([]));
+      listarClientes(q)
+        .then((d) => { if (!cancelado) setResultados((d.clientes || []).slice(0, 8)); })
+        .catch(() => { if (!cancelado) setResultados([]); });
     }, 300);
-    return () => clearTimeout(espera);
+    // Si cambia la búsqueda, la respuesta vieja se descarta
+    return () => { cancelado = true; clearTimeout(espera); };
   }, [q, value, creando]);
 
   if (value) {
@@ -44,7 +48,7 @@ export default function ClienteSelector({ value, onChange }) {
     <div className="space-y-2">
       <div className="relative">
         <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente por nombre, documento o teléfono"
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente por nombre, documento o teléfono" aria-label="Buscar cliente"
           className="input-field pl-9" />
       </div>
       {resultados.map((c) => (

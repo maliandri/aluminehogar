@@ -113,23 +113,26 @@ function ClientesDeVendedoresBlock() {
   const [clientes, setClientes] = useState([]);
   const [q, setQ] = useState('');
   const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    let cancelado = false;
     const espera = setTimeout(() => {
       setCargando(true);
       listarClientes(q)
-        .then((data) => setClientes(data.clientes || []))
-        .catch(() => setClientes([]))
-        .finally(() => setCargando(false));
+        .then((data) => { if (!cancelado) { setClientes(data.clientes || []); setError(null); } })
+        .catch(() => { if (!cancelado) { setClientes([]); setError('No se pudieron cargar los clientes'); } })
+        .finally(() => { if (!cancelado) setCargando(false); });
     }, 300);
-    return () => clearTimeout(espera);
+    // Si cambia la búsqueda, la respuesta vieja se descarta
+    return () => { cancelado = true; clearTimeout(espera); };
   }, [q]);
 
   return (
     <div className="bg-white shadow rounded-lg p-6 space-y-3">
       <h3 className="text-lg font-semibold">Clientes cargados por vendedores</h3>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre, documento o teléfono"
-        className="w-full border rounded px-3 py-2 text-sm" />
+        aria-label="Buscar clientes de vendedores" className="w-full border rounded px-3 py-2 text-sm" />
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="text-left text-xs uppercase text-gray-600">
@@ -150,7 +153,8 @@ function ClientesDeVendedoresBlock() {
             ))}
           </tbody>
         </table>
-        {!cargando && clientes.length === 0 && <p className="text-sm text-gray-500 py-4">No hay clientes cargados por vendedores.</p>}
+        {error && <p role="alert" className="text-sm text-red-700 py-4">{error}</p>}
+        {!cargando && !error && clientes.length === 0 && <p className="text-sm text-gray-500 py-4">No hay clientes cargados por vendedores.</p>}
       </div>
     </div>
   );

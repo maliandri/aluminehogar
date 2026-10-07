@@ -38,7 +38,7 @@ function handleError(error, contexto) {
   if (error.message?.startsWith('Acceso denegado') || error.message?.includes('Token')) {
     return NextResponse.json({ error: error.message }, { status: error.message.includes('Token') ? 401 : 403 });
   }
-  if (error.status === 400) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error.status === 400 || error.status === 502) return NextResponse.json({ error: error.message }, { status: error.status });
   console.error(`Error en clientes ${contexto}:`, error);
   return NextResponse.json({ error: 'Error en el servidor' }, { status: 500 });
 }
@@ -80,9 +80,13 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const decoded = authenticate(request, ['vendedor', 'admin']);
-    await connectDB();
     const body = await request.json().catch(() => ({}));
-    const { action } = body;
+    const { action } = body || {};
+    // Reasignar es solo del administrador: se corta antes de tocar la base
+    if (action === 'reasignar' && decoded.role !== 'admin') {
+      return NextResponse.json({ error: 'Acceso denegado. Solo el administrador puede reasignar clientes.' }, { status: 403 });
+    }
+    await connectDB();
 
     if (action === 'create') {
       const { ok, errores, valor } = validarCliente(body.cliente);
@@ -149,6 +153,23 @@ export async function POST(request) {
       if (anterior) await borrarPrivado(anterior);
       const actualizado = await Cliente.findById(cliente._id);
       return NextResponse.json({ success: true, cliente: publico(actualizado) });
+    }
+
+    if (action === 'reasignar') {
+      const { id, vendedorId } = body;
+      if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(vendedorId)) {
+        return NextResponse.json({ error: 'Cliente y vendedor son requeridos' }, { status: 400 });
+      }
+      const [cliente, destino] = await Promise.all([Cliente.findById(id), User.findById(vendedorId).select('nombre email role')]);
+      if (!cliente) return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
+      if (!destino || !['vendedor', 'admin'].includes(destino.role)) {
+        return NextResponse.json({ error: 'El destino tiene que ser un vendedor' }, { status: 400 });
+      }
+      // Los créditos ya otorgados al cliente conservan su vendedor original
+      cliente.creadoPor = { userId: String(destino._id), nombre: destino.nombre || destino.email };
+      cliente.updatedAt = new Date();
+      await cliente.save();
+      return NextResponse.json({ success: true, cliente: publico(cliente) });
     }
 
     return NextResponse.json({ error: 'Accion invalida' }, { status: 400 });

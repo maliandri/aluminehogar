@@ -491,6 +491,11 @@ export const actualizarCliente = async (id, cliente) => {
   return response.data;
 };
 
+export const reasignarCliente = async (id, vendedorId) => {
+  const response = await api.post('/clientes', { action: 'reasignar', id, vendedorId });
+  return response.data;
+};
+
 export const subirArchivoCliente = async (id, tipo, archivo) => {
   const response = await api.post('/clientes', { action: 'subir-archivo', id, tipo, archivo });
   return response.data;

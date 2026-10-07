@@ -5,9 +5,9 @@ import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { obtenerCreditoConfig, guardarCreditoConfig } from '@/services/api';
 
 const FRECUENCIAS = [
-  { id: 'diaria', titulo: 'Cuotas diarias', unidad: 'días' },
-  { id: 'semanal', titulo: 'Cuotas semanales', unidad: 'semanas' },
-  { id: 'mensual', titulo: 'Cuotas mensuales', unidad: 'meses' },
+  { id: 'diaria', titulo: 'Cuotas diarias', unidad: 'días', agregar: 'Agregar plan diario' },
+  { id: 'semanal', titulo: 'Cuotas semanales', unidad: 'semanas', agregar: 'Agregar plan semanal' },
+  { id: 'mensual', titulo: 'Cuotas mensuales', unidad: 'meses', agregar: 'Agregar plan mensual' },
 ];
 
 export default function PlanesCreditoPanel() {
@@ -32,11 +32,17 @@ export default function PlanesCreditoPanel() {
     setPlanes((prev) => [...prev, { frecuencia, cuotas: 1, recargo: 0, requiereAprobacion: false, activo: true }]);
 
   const handleGuardar = async () => {
+    const montoNum = Number(monto);
+    if (monto.trim() === '' || !Number.isFinite(montoNum) || montoNum < 0) {
+      setErrores([]);
+      setMensaje({ tipo: 'error', texto: 'Ingresá el monto máximo sin aprobación (un número de 0 o más).' });
+      return;
+    }
     setGuardando(true);
     setMensaje(null);
     setErrores([]);
     try {
-      const data = await guardarCreditoConfig({ montoMaximoSinAprobacion: Number(monto), planes });
+      const data = await guardarCreditoConfig({ montoMaximoSinAprobacion: montoNum, planes });
       setMonto(String(data.config.montoMaximoSinAprobacion));
       setPlanes(data.config.planes);
       setMensaje({ tipo: 'ok', texto: 'Guardado. Los vendedores ya ven los planes nuevos.' });
@@ -94,13 +100,13 @@ export default function PlanesCreditoPanel() {
                 <input type="checkbox" checked={p.activo} onChange={(e) => cambiar(indice, { activo: e.target.checked })} />
                 Activo
               </label>
-              <button type="button" aria-label="Quitar plan" onClick={() => quitar(indice)}
+              <button type="button" aria-label={`Quitar plan ${p.frecuencia} de ${p.cuotas} cuotas`} onClick={() => quitar(indice)}
                 className="ml-auto p-1.5 rounded border text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
             </div>
           ))}
           <button type="button" onClick={() => agregar(f.id)}
             className="flex items-center gap-2 border border-dashed border-gray-400 px-3 py-1.5 rounded text-sm text-gray-600 hover:bg-gray-50">
-            <Plus className="w-4 h-4" /> Agregar plan {f.id}
+            <Plus className="w-4 h-4" /> {f.agregar}
           </button>
         </section>
       ))}

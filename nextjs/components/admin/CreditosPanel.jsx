@@ -15,6 +15,10 @@ const ESTADOS = {
 
 const plata = (n) => `$${Number(n || 0).toLocaleString('es-AR')}`;
 const fecha = (f) => (f ? new Date(f).toLocaleDateString('es-AR') : '-');
+// Créditos viejos con anticipo pero sin registro de cobro: no se sabe si se cobró
+const estadoAnticipo = (c) => (c.anticipoPago?.estado === 'cobrado' ? 'cobrado' : c.anticipoPago?.estado === 'pendiente' ? 'pendiente' : 'sin_registro');
+const FRECUENCIAS = { diaria: ['diaria', 'diarias'], semanal: ['semanal', 'semanales'], mensual: ['mensual', 'mensuales'] };
+const textoPlan = (n, frecuencia) => `${n} ${n === 1 ? 'cuota' : 'cuotas'} ${(FRECUENCIAS[frecuencia] || FRECUENCIAS.mensual)[n === 1 ? 0 : 1]}`;
 const formaDeCobro = (pago) => (pago?.metodo === 'efectivo' ? 'En mano' : pago?.metodo === 'comprobante' ? 'Comprobante' : '');
 
 export default function CreditosPanel() {
@@ -52,7 +56,8 @@ export default function CreditosPanel() {
   }, [creditos, filtroEstado, filtroVendedor, texto]);
 
   const resolver = async (credito, accion) => {
-    if (!confirm(accion === 'aprobar' ? `¿Aprobar el crédito de ${credito.clienteNombre}?` : `¿Rechazar el crédito de ${credito.clienteNombre}? Se repone el stock.`)) return;
+    const avisoAnticipo = accion === 'rechazar' && credito.anticipoPago?.estado === 'cobrado' ? ' El anticipo ya fue cobrado: acordate de devolverlo al cliente.' : '';
+    if (!confirm(accion === 'aprobar' ? `¿Aprobar el crédito de ${credito.clienteNombre}?` : `¿Rechazar el crédito de ${credito.clienteNombre}? Se repone el stock.${avisoAnticipo}`)) return;
     setTrabajando(credito._id);
     try {
       await (accion === 'aprobar' ? aprobarCredito(credito._id) : rechazarCredito(credito._id));
@@ -71,7 +76,8 @@ export default function CreditosPanel() {
     const pagadas = (c.cuotas || []).filter((q) => q.estado === 'pagada');
     const montoCuotas = pagadas.reduce((a, q) => a + q.monto, 0);
     const anticipo = c.anticipoPago?.estado === 'cobrado' ? c.anticipo : 0;
-    return { cuotas: `${pagadas.length}/${(c.cuotas || []).length}`, monto: montoCuotas + anticipo };
+    const total = (c.cuotas || []).length;
+    return { cuotas: `${pagadas.length}/${total}`, total, monto: montoCuotas + anticipo };
   };
 
   const quienAprobo = (c) => {
@@ -89,14 +95,14 @@ export default function CreditosPanel() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Buscar por cliente, producto o vendedor"
+        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Buscar por cliente, producto o vendedor" aria-label="Buscar créditos"
           className="border rounded px-3 py-2 text-sm flex-1 min-w-[14rem]" />
-        <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="border rounded px-2 py-2 text-sm">
+        <select aria-label="Filtrar por estado" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="border rounded px-2 py-2 text-sm">
           <option value="">Todos los estados</option>
           {Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.texto}</option>)}
         </select>
         {esAdmin && (
-          <select value={filtroVendedor} onChange={(e) => setFiltroVendedor(e.target.value)} className="border rounded px-2 py-2 text-sm">
+          <select aria-label="Filtrar por vendedor" value={filtroVendedor} onChange={(e) => setFiltroVendedor(e.target.value)} className="border rounded px-2 py-2 text-sm">
             <option value="">Todos los vendedores</option>
             {vendedores.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
@@ -131,7 +137,7 @@ export default function CreditosPanel() {
                 <Fragment key={c._id}>
                   <tr className="align-top">
                     <td className="px-3 py-3">
-                      <button type="button" aria-label={expandido ? 'Ocultar detalle' : 'Ver detalle'} onClick={() => setAbierto(expandido ? null : c._id)}>
+                      <button type="button" aria-label={expandido ? 'Ocultar detalle' : 'Ver detalle'} aria-expanded={expandido} onClick={() => setAbierto(expandido ? null : c._id)}>
                         {expandido ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       </button>
                     </td>
@@ -142,20 +148,20 @@ export default function CreditosPanel() {
                     <td className="px-3 py-3">{quienAprobo(c)}</td>
                     <td className="px-3 py-3 whitespace-nowrap">
                       {plata(c.anticipo)}
-                      {c.anticipo > 0 && <span className={`block text-xs ${c.anticipoPago?.estado === 'cobrado' ? 'text-green-700' : 'text-gray-400'}`}>{c.anticipoPago?.estado === 'cobrado' ? 'Cobrado' : 'Sin cobrar'}</span>}
+                      {c.anticipo > 0 && <span className={`block text-xs ${estadoAnticipo(c) === 'cobrado' ? 'text-green-700' : 'text-gray-400'}`}>{{ cobrado: 'Cobrado', pendiente: 'Sin cobrar', sin_registro: 'Sin registro' }[estadoAnticipo(c)]}</span>}
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">
-                      {c.cantidadCuotas} cuotas {{ diaria: 'diarias', semanal: 'semanales', mensual: 'mensuales' }[c.frecuencia || 'mensual']}
+                      {textoPlan(c.cantidadCuotas, c.frecuencia)}
                       {c.recargoPorcentaje > 0 && <span className="block text-xs text-gray-500">+{c.recargoPorcentaje}%</span>}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">{cob.cuotas} cuotas<span className="block text-xs text-gray-500">{plata(cob.monto)}</span></td>
+                    <td className="px-3 py-3 whitespace-nowrap">{cob.cuotas} {cob.total === 1 ? 'cuota' : 'cuotas'}<span className="block text-xs text-gray-500">{plata(cob.monto)}</span></td>
                     <td className="px-3 py-3"><span className={`px-2 py-1 rounded text-xs font-medium ${est.clase}`}>{est.texto}</span></td>
                     {esAdmin && (
                       <td className="px-3 py-3 whitespace-nowrap">
                         {c.estado === 'pendiente_aprobacion' && (
                           <div className="flex gap-1">
-                            <button type="button" disabled={trabajando === c._id} onClick={() => resolver(c, 'aprobar')} className="p-1.5 rounded border text-green-700 hover:bg-green-50" aria-label="Aprobar"><Check className="w-4 h-4" /></button>
-                            <button type="button" disabled={trabajando === c._id} onClick={() => resolver(c, 'rechazar')} className="p-1.5 rounded border text-red-700 hover:bg-red-50" aria-label="Rechazar"><X className="w-4 h-4" /></button>
+                            <button type="button" disabled={trabajando === c._id} onClick={() => resolver(c, 'aprobar')} className="p-1.5 rounded border text-green-700 hover:bg-green-50 disabled:opacity-50" aria-label="Aprobar"><Check className="w-4 h-4" /></button>
+                            <button type="button" disabled={trabajando === c._id} onClick={() => resolver(c, 'rechazar')} className="p-1.5 rounded border text-red-700 hover:bg-red-50 disabled:opacity-50" aria-label="Rechazar"><X className="w-4 h-4" /></button>
                           </div>
                         )}
                       </td>
@@ -178,7 +184,7 @@ export default function CreditosPanel() {
                                 <td className="pr-4 py-1">Anticipo</td>
                                 <td className="pr-4">{plata(c.anticipo)}</td>
                                 <td className="pr-4">-</td>
-                                <td className="pr-4">{c.anticipoPago?.estado === 'cobrado' ? `Cobrado (${formaDeCobro(c.anticipoPago)})` : 'Pendiente'}</td>
+                                <td className="pr-4">{{ cobrado: `Cobrado (${formaDeCobro(c.anticipoPago)})`, pendiente: 'Pendiente', sin_registro: 'Sin registro' }[estadoAnticipo(c)]}</td>
                                 <td className="pr-4">{c.anticipoPago?.registradoPor?.nombre ? `${c.anticipoPago.registradoPor.nombre} · ${fecha(c.anticipoPago.fecha)}` : '-'}</td>
                                 <td>{c.anticipoPago?.metodo === 'comprobante' && <button type="button" onClick={() => verComprobante(c, 0)} className="text-blue-600 hover:underline">Ver comprobante</button>}</td>
                               </tr>

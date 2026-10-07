@@ -11,12 +11,21 @@ export async function subirPrivado(dataUrl, carpeta) {
     error.status = 400;
     throw error;
   }
-  const r = await cloudinary.uploader.upload(dataUrl, {
-    type: 'authenticated',
-    resource_type: 'auto',
-    folder: carpeta,
-    overwrite: false
-  });
+  let r;
+  try {
+    r = await cloudinary.uploader.upload(dataUrl, {
+      type: 'authenticated',
+      resource_type: 'auto',
+      folder: carpeta,
+      overwrite: false
+    });
+  } catch (err) {
+    // El SDK de Cloudinary lanza { error: { message, http_code } }: se registra pero no se expone
+    console.error('Error al subir archivo privado:', err?.error?.message || err?.message || err);
+    const error = new Error('No se pudo guardar el archivo. Probá de nuevo.');
+    error.status = 502;
+    throw error;
+  }
   const formatosOk = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
   if (r.resource_type !== 'image' || !formatosOk.includes(String(r.format || '').toLowerCase())) {
     await borrarPrivado({ publicId: r.public_id, resourceType: r.resource_type });

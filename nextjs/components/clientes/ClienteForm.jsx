@@ -23,7 +23,6 @@ function Campo({ etiqueta, children, ayuda }) {
 }
 
 export default function ClienteForm({ cliente, onGuardado, onCancelar }) {
-  const editando = Boolean(cliente);
   const [datos, setDatos] = useState(() => (cliente ? {
     nombre: cliente.nombre, tipoDocumento: cliente.tipoDocumento, numeroDocumento: cliente.numeroDocumento,
     telefono: cliente.telefono, email: cliente.email, domicilio: { ...cliente.domicilio },
@@ -90,14 +89,14 @@ export default function ClienteForm({ cliente, onGuardado, onCancelar }) {
         </Campo>
         <div className="grid grid-cols-3 gap-2">
           <Campo etiqueta="Documento *">
-            <select className="w-full border rounded px-2 py-2" value={datos.tipoDocumento} disabled={editando}
+            <select className="w-full border rounded px-2 py-2" value={datos.tipoDocumento} disabled={Boolean(actual)}
               onChange={(e) => cambiar('tipoDocumento', e.target.value)}>
               {TIPOS_DOCUMENTO.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </Campo>
           <div className="col-span-2">
             <Campo etiqueta="Número *">
-              <input className="w-full border rounded px-3 py-2" value={datos.numeroDocumento} disabled={editando}
+              <input className="w-full border rounded px-3 py-2" value={datos.numeroDocumento} disabled={Boolean(actual)}
                 onChange={(e) => cambiar('numeroDocumento', e.target.value)} />
             </Campo>
           </div>
@@ -153,10 +152,10 @@ export default function ClienteForm({ cliente, onGuardado, onCancelar }) {
                   <span className="w-56">{etiqueta}</span>
                   <span className={tiene(tipo) ? 'text-green-700' : 'text-gray-400'}>{tiene(tipo) ? 'Cargado' : 'Falta'}</span>
                   {tiene(tipo) && (
-                    <button type="button" onClick={() => abrirBlobEnPestana(obtenerArchivoCliente(actual._id, tipo)).catch(() => setError('No se pudo abrir el archivo'))}
+                    <button type="button" aria-label={`Ver ${etiqueta}`} onClick={() => abrirBlobEnPestana(obtenerArchivoCliente(actual._id, tipo)).catch(() => setError('No se pudo abrir el archivo'))}
                       className="flex items-center gap-1 text-blue-600 hover:underline"><Eye className="w-4 h-4" /> Ver</button>
                   )}
-                  <button type="button" disabled={subiendo === tipo} onClick={() => elegirArchivo(tipo)}
+                  <button type="button" aria-label={`${tiene(tipo) ? 'Reemplazar' : 'Subir'} ${etiqueta}`} disabled={subiendo === tipo} onClick={() => elegirArchivo(tipo)}
                     className="flex items-center gap-1 text-blue-600 hover:underline disabled:text-gray-400">
                     {subiendo === tipo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                     {tiene(tipo) ? 'Reemplazar' : 'Subir'}

@@ -380,9 +380,16 @@ function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [cargandoConfig, setCargandoConfig] = useState(true);
+  const [errorConfig, setErrorConfig] = useState('');
+
+  const cargarConfig = () => {
+    setCargandoConfig(true);
+    setErrorConfig('');
+    obtenerCreditoConfig().then((d) => setConfig(d.config)).catch(() => setErrorConfig('No se pudieron cargar los planes de crédito')).finally(() => setCargandoConfig(false));
+  };
 
   useEffect(() => {
-    obtenerCreditoConfig().then((d) => setConfig(d.config)).catch(() => setError('No se pudieron cargar los planes de crédito')).finally(() => setCargandoConfig(false));
+    cargarConfig();
     listarDepositos().then((data) => {
       const virtuales = (data.depositos || []).filter(d => d.esVirtualVendedor && d.activo);
       setDepositos(virtuales);
@@ -459,7 +466,12 @@ function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
 
         {cargandoConfig ? (
           <p className="text-sm text-gray-500">Cargando planes...</p>
-        ) : !config ? null : frecuenciasDisponibles.length === 0 ? (
+        ) : !config ? (
+          <div className="text-sm text-red-600 flex items-center gap-3">
+            <span>{errorConfig || 'No se pudieron cargar los planes de crédito'}</span>
+            <button type="button" onClick={cargarConfig} className="underline">Reintentar</button>
+          </div>
+        ) : frecuenciasDisponibles.length === 0 ? (
           <p className="text-sm text-red-600">No hay planes de crédito habilitados. Pedile al administrador que los cargue.</p>
         ) : (
           <>
@@ -472,7 +484,7 @@ function OtorgarCreditoTab({ carritoVendedor, calcularTotal, onCreado }) {
             <div>
               <label className="block text-sm font-medium mb-1">Plan</label>
               <select value={plan?.cuotas ?? ''} onChange={(e) => setCuotas(e.target.value)} className="input-field">
-                {planes.map((p) => <option key={p.cuotas} value={p.cuotas}>{p.cuotas} cuotas {p.recargo > 0 ? `(+${p.recargo}%)` : '(sin recargo)'}</option>)}
+                {planes.map((p) => <option key={p.cuotas} value={p.cuotas}>{p.cuotas} {p.cuotas === 1 ? 'cuota' : 'cuotas'} {p.recargo > 0 ? `(+${p.recargo}%)` : '(sin recargo)'}</option>)}
               </select>
             </div>
             {calculo?.ok && (
@@ -569,7 +581,7 @@ function MisCreditosTab({ isOpen }) {
             {estadoBadge(credito.estado)}
           </div>
           <div className="text-sm text-gray-600 mb-1">
-            Total ${credito.montoTotal.toLocaleString('es-AR')} — Anticipo ${credito.anticipo.toLocaleString('es-AR')} — {credito.cantidadCuotas} cuotas {{ diaria: 'diarias', semanal: 'semanales', mensual: 'mensuales' }[credito.frecuencia || 'mensual']}
+            Total ${credito.montoTotal.toLocaleString('es-AR')} — Anticipo ${credito.anticipo.toLocaleString('es-AR')} — {credito.cantidadCuotas} {credito.cantidadCuotas === 1 ? 'cuota' : 'cuotas'} {{ diaria: ['diaria', 'diarias'], semanal: ['semanal', 'semanales'], mensual: ['mensual', 'mensuales'] }[credito.frecuencia || 'mensual'][credito.cantidadCuotas === 1 ? 0 : 1]}
             {credito.recargoPorcentaje > 0 ? ` (+${credito.recargoPorcentaje}%)` : ''}
           </div>
           {credito.aprobadoPor && (
@@ -594,7 +606,10 @@ function MisCreditosTab({ isOpen }) {
                       )}
                     </>
                   ) : (
-                    <button onClick={() => setCobro({ credito, numero: 0, titulo: 'Cobrar anticipo' })} className="text-primary hover:underline">Registrar cobro</button>
+                    <>
+                      {credito.anticipoPago?.estado !== 'pendiente' && <span className="text-gray-500">— sin registro</span>}
+                      <button onClick={() => setCobro({ credito, numero: 0, titulo: 'Cobrar anticipo' })} className="text-primary hover:underline">Registrar cobro</button>
+                    </>
                   )}
                 </div>
               )}

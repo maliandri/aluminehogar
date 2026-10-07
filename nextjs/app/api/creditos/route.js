@@ -7,29 +7,56 @@ import User from '@/lib/models/User';
 import Product from '@/lib/models/Product';
 import { extractTokenFromHeaders, verifyToken, requireRole } from '@/lib/auth-helpers';
 import { getCreditoConfig } from '@/lib/credito-config';
-import { subirPrivado } from '@/lib/archivos-privados';
+import { subirPrivado, borrarPrivado } from '@/lib/archivos-privados';
 import { calcularPlan, evaluarAprobacion, buscarPlan } from '@/lib/credito-calculo';
 
 async function ajustarStockDeposito(productos, depositoId, delta) {
   if (!depositoId) return;
-  for (const item of productos) {
-    if (!item.productId) continue;
-    const producto = await Product.findById(item.productId);
-    if (!producto) continue;
+  for (const item of productos || []) {
+    // Los productos se identifican con un _id de texto (ej. 'ALM-0001'); un id vacío o raro se ignora
+    if (typeof item?.productId !== 'string' || !item.productId || item.productId.length > 100) continue;
+    try {
+      const producto = await Product.findById(item.productId);
+      if (!producto) continue;
 
-    const stockPorDeposito = producto.stockPorDeposito || [];
-    const entrada = stockPorDeposito.find(d => d.depositoId === depositoId);
-    if (entrada) {
-      entrada.cantidad = Math.max(0, entrada.cantidad + delta * item.cantidad);
-    } else if (delta > 0) {
-      stockPorDeposito.push({ depositoId, cantidad: delta * item.cantidad });
+      const stockPorDeposito = producto.stockPorDeposito || [];
+      const entrada = stockPorDeposito.find(d => d.depositoId === depositoId);
+      if (entrada) {
+        entrada.cantidad = Math.max(0, entrada.cantidad + delta * item.cantidad);
+      } else if (delta > 0) {
+        stockPorDeposito.push({ depositoId, cantidad: delta * item.cantidad });
+      }
+
+      producto.stockPorDeposito = stockPorDeposito;
+      producto.stock = stockPorDeposito.reduce((sum, d) => sum + d.cantidad, 0);
+      await producto.save();
+    } catch (error) {
+      // El crédito ya está guardado: un problema de stock no debe hacer fallar el pedido
+      console.error('No se pudo ajustar el stock de', item.productId, error);
     }
-
-    producto.stockPorDeposito = stockPorDeposito;
-    producto.stock = stockPorDeposito.reduce((sum, d) => sum + d.cantidad, 0);
-    await producto.save();
   }
 }
+
+// Forma pública de un crédito: los comprobantes salen sin los datos internos de Cloudinary
+function publicoPago(pago) {
+  if (!pago || typeof pago !== 'object') return pago;
+  const { comprobante, ...resto } = pago;
+  return comprobante ? { ...resto, tieneComprobante: true } : resto;
+}
+
+function publicoCredito(credito) {
+  const c = credito && typeof credito.toObject === 'function' ? credito.toObject() : { ...credito };
+  if (c.anticipoPago) c.anticipoPago = publicoPago(c.anticipoPago);
+  if (Array.isArray(c.cuotas)) c.cuotas = c.cuotas.map((q) => (q?.pago ? { ...q, pago: publicoPago(q.pago) } : q));
+  return c;
+}
+
+const ROLES_ACCION = {
+  create: ['vendedor', 'admin'],
+  'registrar-cobro': ['vendedor', 'admin'],
+  aprobar: ['admin'],
+  rechazar: ['admin']
+};
 
 function authenticate(request, roles) {
   const token = extractTokenFromHeaders(request.headers);
@@ -63,7 +90,7 @@ export async function GET(request) {
     const query = decoded.role === 'admin' ? {} : { vendedorId: decoded.userId };
     const creditos = await CreditoVenta.find(query).sort({ createdAt: -1 }).lean();
 
-    return NextResponse.json({ success: true, creditos });
+    return NextResponse.json({ success: true, creditos: creditos.map(publicoCredito) });
   } catch (error) {
     return handleError(error);
   }
@@ -72,17 +99,34 @@ export async function GET(request) {
 // POST /api/creditos -> body { action: 'create' | 'registrar-cobro' | 'aprobar' | 'rechazar', ... }
 export async function POST(request) {
   try {
-    await connectDB();
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 });
+    }
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 });
+    }
     const { action } = body;
+    if (typeof action !== 'string' || !Object.prototype.hasOwnProperty.call(ROLES_ACCION, action)) {
+      return NextResponse.json({ error: 'Accion invalida' }, { status: 400 });
+    }
+
+    // Primero quién es y qué puede hacer; recién después se toca la base
+    const decoded = authenticate(request, ROLES_ACCION[action]);
+    await connectDB();
 
     if (action === 'create') {
-      const decoded = authenticate(request, ['vendedor', 'admin']);
       const { clienteId, productos, montoTotal, anticipo, frecuencia, cantidadCuotas, depositoId } = body;
 
       if (!mongoose.isValidObjectId(clienteId)) {
         return NextResponse.json({ error: 'Elegí un cliente' }, { status: 400 });
       }
+      if (depositoId !== undefined && depositoId !== null && typeof depositoId !== 'string') {
+        return NextResponse.json({ error: 'Depósito inválido' }, { status: 400 });
+      }
+      const deposito = typeof depositoId === 'string' && depositoId.trim() ? depositoId.trim() : null;
       const cliente = await Cliente.findById(clienteId);
       // Un cliente ajeno se responde igual que uno inexistente
       if (!cliente || (decoded.role !== 'admin' && (!decoded.userId || cliente.creadoPor?.userId !== decoded.userId))) {
@@ -114,7 +158,7 @@ export async function POST(request) {
         vendedorId: decoded.userId,
         vendedorNombre: quien.nombre,
         cargadoPor: quien,
-        depositoId: depositoId || null,
+        depositoId: deposito,
         productos: limpiarProductos(productos),
         montoTotal: total,
         anticipo: ant,
@@ -133,13 +177,12 @@ export async function POST(request) {
       await credito.save();
 
       // Descuenta stock del deposito elegido (si el vendedor especifico uno)
-      await ajustarStockDeposito(credito.productos, depositoId, -1);
+      await ajustarStockDeposito(credito.productos, deposito, -1);
 
-      return NextResponse.json({ success: true, credito }, { status: 201 });
+      return NextResponse.json({ success: true, credito: publicoCredito(credito) }, { status: 201 });
     }
 
     if (action === 'registrar-cobro') {
-      const decoded = authenticate(request, ['vendedor', 'admin']);
       const { id, metodo, archivo } = body;
       const numero = Number(body.numero);
 
@@ -184,25 +227,37 @@ export async function POST(request) {
       }
       const registradoPor = { userId: decoded.userId, nombre: await nombreDe(decoded.userId) };
       const fecha = new Date();
+      const pago = { metodo, registradoPor, fecha };
+      if (comprobante) pago.comprobante = comprobante;
 
-      if (numero === 0) {
-        credito.anticipoPago = { estado: 'cobrado', metodo, comprobante, registradoPor, fecha };
-      } else {
-        cuota.estado = 'pagada';
-        cuota.fechaPago = fecha;
-        cuota.pago = { metodo, comprobante, registradoPor, fecha };
-        if (credito.cuotas.every((c) => c.estado === 'pagada')) credito.estado = 'completado';
+      // Atómico: si dos cobros llegan a la vez, solo uno gana el filtro (el otro no matchea)
+      const resultado = numero === 0
+        ? await CreditoVenta.updateOne(
+          { _id: credito._id, 'anticipoPago.estado': { $ne: 'cobrado' } },
+          { $set: { anticipoPago: { estado: 'cobrado', ...pago } } }
+        )
+        : await CreditoVenta.updateOne(
+          { _id: credito._id, cuotas: { $elemMatch: { numero, estado: 'pendiente' } } },
+          { $set: { 'cuotas.$.estado': 'pagada', 'cuotas.$.fechaPago': fecha, 'cuotas.$.pago': pago } }
+        );
+      if (resultado.matchedCount === 0) {
+        if (comprobante) await borrarPrivado(comprobante);
+        return NextResponse.json({ error: 'Ese pago ya está registrado' }, { status: 409 });
       }
-      await credito.save();
 
-      return NextResponse.json({ success: true, credito });
+      let fresco = await CreditoVenta.findById(credito._id);
+      if (fresco && fresco.estado === 'activo' && fresco.cuotas.every((c) => c.estado === 'pagada')) {
+        await CreditoVenta.updateOne({ _id: credito._id, estado: 'activo' }, { $set: { estado: 'completado' } });
+        fresco = await CreditoVenta.findById(credito._id);
+      }
+
+      return NextResponse.json({ success: true, credito: publicoCredito(fresco) });
     }
 
     if (action === 'aprobar' || action === 'rechazar') {
-      const decoded = authenticate(request, ['admin']);
       const { id } = body;
 
-      if (!id) {
+      if (!mongoose.isValidObjectId(id)) {
         return NextResponse.json({ error: 'ID de credito requerido' }, { status: 400 });
       }
 
@@ -227,7 +282,7 @@ export async function POST(request) {
         await ajustarStockDeposito(credito.productos, credito.depositoId, 1);
       }
 
-      return NextResponse.json({ success: true, credito });
+      return NextResponse.json({ success: true, credito: publicoCredito(credito) });
     }
 
     return NextResponse.json({ error: 'Accion invalida' }, { status: 400 });
@@ -244,8 +299,8 @@ function handleError(error) {
   if (error.message === 'Token invalido o expirado' || error.message === 'Token de autenticacion requerido') {
     return NextResponse.json({ error: error.message }, { status: 401 });
   }
-  if (error.status === 400) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error.status === 400 || error.status === 502) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
   }
   return NextResponse.json({ error: 'Error en el servidor.' }, { status: 500 });
 }

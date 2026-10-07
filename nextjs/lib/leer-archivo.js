@@ -21,12 +21,21 @@ export async function archivoADataUrl(file, { maxDim = 1600, calidad = 0.82 } = 
   }
   if (!IMAGENES.includes(file.type)) throw new Error('Solo se aceptan imágenes JPG, PNG o WebP, o PDF');
 
-  const bitmap = await createImageBitmap(file);
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error('No se pudo leer la imagen. Probá con otra foto o con un PDF');
+  }
   const escala = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(bitmap.width * escala));
   canvas.height = Math.max(1, Math.round(bitmap.height * escala));
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
   const dataUrl = canvas.toDataURL('image/jpeg', calidad);
 
   // Aproximación del tamaño real del binario a partir del base64
