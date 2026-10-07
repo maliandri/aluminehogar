@@ -21,7 +21,7 @@ export async function GET(request) {
 
     await connectDB();
     const cliente = await Cliente.findById(id);
-    if (!cliente || (decoded.role !== 'admin' && cliente.creadoPor?.userId !== decoded.userId)) return noEncontrado;
+    if (!cliente || (decoded.role !== 'admin' && !(decoded.userId && cliente.creadoPor?.userId === decoded.userId))) return noEncontrado;
 
     const archivo = cliente.archivos.find((a) => a.tipo === tipo);
     if (!archivo) return noEncontrado;

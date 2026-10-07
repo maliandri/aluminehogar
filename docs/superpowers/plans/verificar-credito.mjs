@@ -202,18 +202,33 @@ t('tipos de archivo del cliente', () => assert.deepEqual(Object.keys(V.TIPOS_ARC
 
 // ---------- archivos ----------
 const b64 = (n) => Buffer.alloc(n, 1).toString('base64');
+const CABECERAS = {
+  'image/jpeg': Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+  'image/png': Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  'image/webp': Buffer.concat([Buffer.from('RIFF'), Buffer.from([1, 2, 3, 4]), Buffer.from('WEBP')]),
+  'application/pdf': Buffer.from('%PDF-1.4')
+};
+const conCabecera = (mime, n) => Buffer.concat([CABECERAS[mime], Buffer.alloc(n - CABECERAS[mime].length, 1)]).toString('base64');
 t('archivo png chico válido', () => {
-  const r = A.validarArchivo(`data:image/png;base64,${b64(1000)}`);
+  const r = A.validarArchivo(`data:image/png;base64,${conCabecera('image/png', 1000)}`);
   assert.equal(r.ok, true);
   assert.equal(r.mime, 'image/png');
   assert.equal(r.bytes, 1000);
 });
-t('archivo pdf válido', () => assert.equal(A.validarArchivo(`data:application/pdf;base64,${b64(500)}`).ok, true));
+t('archivo pdf válido', () => assert.equal(A.validarArchivo(`data:application/pdf;base64,${conCabecera('application/pdf', 500)}`).ok, true));
 for (const mime of ['text/html', 'image/svg+xml', 'application/x-msdownload', 'application/javascript']) {
   t(`rechaza ${mime}`, () => assert.equal(A.validarArchivo(`data:${mime};base64,${b64(100)}`).ok, false));
 }
-t('rechaza archivo demasiado grande', () => assert.equal(A.validarArchivo(`data:image/jpeg;base64,${b64(3 * 1024 * 1024 + 10)}`).ok, false));
-t('acepta justo en el límite', () => assert.equal(A.validarArchivo(`data:image/jpeg;base64,${b64(3 * 1024 * 1024)}`).ok, true));
+t('rechaza archivo demasiado grande', () => assert.equal(A.validarArchivo(`data:image/jpeg;base64,${conCabecera('image/jpeg', 3 * 1024 * 1024 + 10)}`).ok, false));
+for (const mime of Object.keys(CABECERAS)) {
+  t(`acepta justo en el límite con cabecera real de ${mime}`, () => assert.equal(A.validarArchivo(`data:${mime};base64,${conCabecera(mime, 3 * 1024 * 1024)}`).ok, true));
+}
+const b64Texto = (txt) => Buffer.from(txt).toString('base64');
+t('rechaza SVG declarado como png', () => assert.equal(A.validarArchivo(`data:image/png;base64,${b64Texto('<svg onload="alert(1)" xmlns="http://www.w3.org/2000/svg"></svg>')}`).ok, false));
+t('rechaza HTML declarado como pdf', () => assert.equal(A.validarArchivo(`data:application/pdf;base64,${b64Texto('<html><script>alert(1)</script></html>')}`).ok, false));
+t('rechaza cabecera PNG declarada como jpeg', () => assert.equal(A.validarArchivo(`data:image/jpeg;base64,${conCabecera('image/png', 100)}`).ok, false));
+t('rechaza RIFF que no es WEBP', () => assert.equal(A.validarArchivo(`data:image/webp;base64,${Buffer.concat([Buffer.from('RIFF'), Buffer.from([1,2,3,4]), Buffer.from('WAVE'), Buffer.alloc(20,1)]).toString('base64')}`).ok, false));
+t('rechaza archivo más corto que la cabecera', () => assert.equal(A.validarArchivo(`data:image/png;base64,${Buffer.from([0x89, 0x50]).toString('base64')}`).ok, false));
 t('rechaza entradas mal formadas', () => {
   assert.equal(A.validarArchivo(null).ok, false);
   assert.equal(A.validarArchivo('hola').ok, false);
@@ -257,7 +272,7 @@ t('buscarPlan estricto con activo y tolerante con cuotas texto', () => {
 });
 t('validarArchivo con maxBytes inválido usa el máximo', () => {
   assert.equal(A.validarArchivo(`data:image/jpeg;base64,${b64(4 * 1024 * 1024)}`, NaN).ok, false);
-  assert.equal(A.validarArchivo(`data:image/jpeg;base64,${b64(1000)}`, -5).ok, true);
+  assert.equal(A.validarArchivo(`data:image/jpeg;base64,${conCabecera('image/jpeg', 1000)}`, -5).ok, true);
 });
 t('rechaza email de más de 120 caracteres', () => assert.equal(con({ email: 'a'.repeat(115) + '@b.com' }).ok, false));
 

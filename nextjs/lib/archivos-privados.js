@@ -17,6 +17,13 @@ export async function subirPrivado(dataUrl, carpeta) {
     folder: carpeta,
     overwrite: false
   });
+  const formatosOk = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+  if (r.resource_type !== 'image' || !formatosOk.includes(String(r.format || '').toLowerCase())) {
+    await borrarPrivado({ publicId: r.public_id, resourceType: r.resource_type });
+    const error = new Error('El archivo no es una imagen o PDF válido');
+    error.status = 400;
+    throw error;
+  }
   return { publicId: r.public_id, resourceType: r.resource_type, formato: r.format || null, version: r.version || null };
 }
 
@@ -39,6 +46,8 @@ function urlFirmada(archivo) {
   });
 }
 
+const TIPOS_CONTENIDO = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', pdf: 'application/pdf' };
+
 // Trae el archivo de Cloudinary con la URL firmada (que nunca sale del servidor) y lo devuelve como respuesta
 export async function entregarArchivo(archivo) {
   const res = await fetch(urlFirmada(archivo));
@@ -47,12 +56,15 @@ export async function entregarArchivo(archivo) {
     error.status = 502;
     throw error;
   }
+  const tipo = TIPOS_CONTENIDO[String(archivo.formato || '').toLowerCase()];
+  // El Content-Type nunca se copia de Cloudinary: se fija según lo que validamos al subir
   return new Response(res.body, {
     headers: {
-      'Content-Type': res.headers.get('content-type') || 'application/octet-stream',
+      'Content-Type': tipo || 'application/octet-stream',
       'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
-      'Content-Disposition': 'inline'
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      'Content-Disposition': tipo ? 'inline' : 'attachment'
     }
   });
 }

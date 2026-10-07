@@ -15,7 +15,7 @@ function authenticate(request, roles) {
   return decoded;
 }
 
-const esDueno = (cliente, decoded) => decoded.role === 'admin' || cliente.creadoPor?.userId === decoded.userId;
+const esDueno = (cliente, decoded) => decoded.role === 'admin' || Boolean(decoded.userId && cliente.creadoPor?.userId === decoded.userId);
 const escaparRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Forma pública: nunca incluye el publicId interno de los archivos
@@ -128,19 +128,27 @@ export async function POST(request) {
     if (action === 'subir-archivo') {
       const { cliente, respuesta } = await cargarCliente(body.id, decoded);
       if (respuesta) return respuesta;
-      if (!Object.prototype.hasOwnProperty.call(TIPOS_ARCHIVO, body.tipo)) {
+      if (typeof body.tipo !== 'string' || !Object.prototype.hasOwnProperty.call(TIPOS_ARCHIVO, body.tipo)) {
         return NextResponse.json({ error: 'Tipo de documento inválido' }, { status: 400 });
       }
 
       const subido = await subirPrivado(body.archivo, `clientes/${cliente._id}`);
       const usuario = await User.findById(decoded.userId).select('nombre email');
       const anterior = cliente.archivos.find((a) => a.tipo === body.tipo);
-      cliente.archivos = cliente.archivos.filter((a) => a.tipo !== body.tipo);
-      cliente.archivos.push({ tipo: body.tipo, ...subido, subidoPor: { userId: decoded.userId, nombre: usuario?.nombre || usuario?.email || '' }, fecha: new Date() });
-      cliente.updatedAt = new Date();
-      await cliente.save();
+      const nuevo = { tipo: body.tipo, ...subido, subidoPor: { userId: decoded.userId, nombre: usuario?.nombre || usuario?.email || '' }, fecha: new Date() };
+      try {
+        // Actualizaciones atómicas: subidas simultáneas de distintos documentos no se pisan
+        const r = await Cliente.updateOne({ _id: cliente._id, 'archivos.tipo': body.tipo }, { $set: { 'archivos.$': nuevo, updatedAt: new Date() } });
+        if (r.matchedCount === 0) {
+          await Cliente.updateOne({ _id: cliente._id, 'archivos.tipo': { $ne: body.tipo } }, { $push: { archivos: nuevo }, $set: { updatedAt: new Date() } });
+        }
+      } catch (errorDB) {
+        await borrarPrivado(subido);
+        throw errorDB;
+      }
       if (anterior) await borrarPrivado(anterior);
-      return NextResponse.json({ success: true, cliente: publico(cliente) });
+      const actualizado = await Cliente.findById(cliente._id);
+      return NextResponse.json({ success: true, cliente: publico(actualizado) });
     }
 
     return NextResponse.json({ error: 'Accion invalida' }, { status: 400 });
