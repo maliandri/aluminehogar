@@ -223,6 +223,44 @@ t('rechaza entradas mal formadas', () => {
   assert.equal(A.validarArchivo({ x: 1 }).ok, false);
 });
 
+// ---------- endurecimiento (ronda de fixes 1) ----------
+t('rechaza cuotas de $0', () => {
+  assert.equal(C.calcularPlan({ ...base, montoTotal: 0.01, anticipo: 0, cantidadCuotas: 2, recargoPorcentaje: 0 }).ok, false);
+  assert.equal(C.calcularPlan({ ...base, montoTotal: 1, anticipo: 0, cantidadCuotas: 365, frecuencia: 'diaria', recargoPorcentaje: 0 }).ok, false);
+});
+t('acepta 100 en 365 cuotas sin anticipo', () => {
+  const r = C.calcularPlan({ ...base, montoTotal: 100, anticipo: 0, cantidadCuotas: 365, frecuencia: 'diaria', recargoPorcentaje: 0 });
+  assert.equal(r.ok, true);
+  assert.equal(Math.min(...r.cuotas.map((c) => c.monto)), 0.27);
+  assert.equal(Math.round(r.cuotas.reduce((a, c) => a + c.monto, 0) * 100) / 100, 100);
+});
+t('cuota única con recargo 300 y sin anticipo', () => {
+  const r = C.calcularPlan({ ...base, montoTotal: 50000, anticipo: 0, cantidadCuotas: 1, recargoPorcentaje: 300 });
+  assert.equal(r.ok, true);
+  assert.equal(r.totalCuotas, 200000);
+  assert.equal(r.cuotas[0].monto, 200000);
+});
+t('rechaza monto total gigante', () => assert.equal(C.calcularPlan({ ...base, montoTotal: 2e9 }).ok, false));
+t('calcularPlan con null o undefined no explota', () => {
+  assert.equal(C.calcularPlan(null).ok, false);
+  assert.equal(C.calcularPlan(undefined).ok, false);
+  assert.equal(C.calcularPlan('x').ok, false);
+});
+t('año bisiesto', () => assert.equal(dia(C.sumarPeriodo(new Date(2028, 0, 31, 12), 'mensual', 1)), '2028-2-29'));
+t('el vencimiento no depende de la hora', () => {
+  assert.equal(dia(C.sumarPeriodo(new Date(2026, 0, 31, 0, 59), 'mensual', 1)), dia(C.sumarPeriodo(new Date(2026, 0, 31, 23, 59), 'mensual', 1)));
+});
+t('buscarPlan estricto con activo y tolerante con cuotas texto', () => {
+  assert.equal(C.buscarPlan([{ ...planes[0], activo: 'no' }], 'mensual', 3), null);
+  assert.equal(C.buscarPlan(planes, 'mensual', '3').recargo, 10);
+  assert.equal(C.buscarPlan(planes, 'mensual', 3.5), null);
+});
+t('validarArchivo con maxBytes inválido usa el máximo', () => {
+  assert.equal(A.validarArchivo(`data:image/jpeg;base64,${b64(4 * 1024 * 1024)}`, NaN).ok, false);
+  assert.equal(A.validarArchivo(`data:image/jpeg;base64,${b64(1000)}`, -5).ok, true);
+});
+t('rechaza email de más de 120 caracteres', () => assert.equal(con({ email: 'a'.repeat(115) + '@b.com' }).ok, false));
+
 if (problemas.length) {
   console.error(`✗ ${problemas.length} problema(s):\n` + problemas.map((p) => '  - ' + p).join('\n'));
   process.exit(1);

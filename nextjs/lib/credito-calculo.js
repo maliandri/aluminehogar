@@ -26,9 +26,12 @@ export function sumarPeriodo(fecha, frecuencia, n) {
 }
 
 // recargo% sobre el saldo financiado (total − anticipo); cuotas iguales al centavo y la última absorbe la diferencia
-export function calcularPlan({ montoTotal, anticipo = 0, cantidadCuotas, frecuencia, recargoPorcentaje = 0, desde = new Date() }) {
+export function calcularPlan(entrada) {
+  if (!entrada || typeof entrada !== 'object') return { ok: false, errores: ['Datos del plan inválidos'] };
+  const { montoTotal, anticipo = 0, cantidadCuotas, frecuencia, recargoPorcentaje = 0, desde = new Date() } = entrada;
   const errores = [];
   if (!esNumero(montoTotal) || montoTotal <= 0) errores.push('El monto total tiene que ser mayor a 0');
+  else if (montoTotal > 1e9) errores.push('El monto total es demasiado grande');
   if (!esNumero(anticipo) || anticipo < 0) errores.push('El anticipo no es válido');
   if (esNumero(montoTotal) && esNumero(anticipo) && anticipo >= montoTotal) errores.push('El anticipo tiene que ser menor al monto total');
   if (!Number.isInteger(cantidadCuotas) || cantidadCuotas < 1 || cantidadCuotas > 365) errores.push('La cantidad de cuotas no es válida');
@@ -40,6 +43,7 @@ export function calcularPlan({ montoTotal, anticipo = 0, cantidadCuotas, frecuen
   const interes = redondear((montoFinanciado * recargoPorcentaje) / 100);
   const totalCuotas = redondear(montoFinanciado + interes);
   const montoCuota = Math.floor((totalCuotas / cantidadCuotas) * 100) / 100;
+  if (montoCuota < 0.01) return { ok: false, errores: ['El monto es muy chico para esa cantidad de cuotas'] };
 
   const cuotas = [];
   let acumulado = 0;
@@ -65,8 +69,10 @@ export function evaluarAprobacion({ montoTotal, plan, montoMaximoSinAprobacion }
 // Plan activo de la tabla para esa frecuencia y cantidad de cuotas; null si no existe o está inactivo
 export function buscarPlan(planes, frecuencia, cuotas) {
   if (!Array.isArray(planes)) return null;
-  const plan = planes.find((p) => p && p.frecuencia === frecuencia && p.cuotas === Number(cuotas));
-  return plan && plan.activo ? plan : null;
+  const n = Number(cuotas);
+  if (!Number.isInteger(n)) return null;
+  const plan = planes.find((p) => p && p.frecuencia === frecuencia && p.cuotas === n);
+  return plan && plan.activo === true ? plan : null;
 }
 
 // Planes mensuales de 1 a N cuotas sin recargo: reproducen el comportamiento anterior (cuotas máximas del admin)

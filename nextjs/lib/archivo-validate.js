@@ -3,7 +3,8 @@
 export const MIMES_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 export const MAX_BYTES = 3 * 1024 * 1024;
 
-export function validarArchivo(dataUrl, maxBytes = MAX_BYTES) {
+export function validarArchivo(dataUrl, maxBytesEntrada = MAX_BYTES) {
+  const maxBytes = typeof maxBytesEntrada === 'number' && Number.isFinite(maxBytesEntrada) && maxBytesEntrada > 0 ? maxBytesEntrada : MAX_BYTES;
   if (typeof dataUrl !== 'string') return { ok: false, error: 'Archivo inválido' };
   const m = dataUrl.match(/^data:([a-z]+\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/i);
   if (!m) return { ok: false, error: 'Archivo inválido' };
