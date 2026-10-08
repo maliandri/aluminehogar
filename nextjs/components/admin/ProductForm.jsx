@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, ImagePlus, Trash2, Upload, X, Sparkles, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, ImagePlus, Trash2, Upload, X, Sparkles, Loader2, ExternalLink } from 'lucide-react';
 import {
   crearProducto,
   actualizarProducto,
@@ -71,8 +71,22 @@ export default function ProductForm({ producto, categorias, onClose, onSuccess }
     return null;
   })();
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
+  // Ctrl+V con una imagen copiada (ej. desde Google Imágenes) la sube como imagen del producto.
+  // Si lo copiado es texto, no hace nada y el pegado normal sigue funcionando.
+  useEffect(() => {
+    const onPaste = (e) => {
+      const item = Array.from(e.clipboardData?.items || []).find((i) => i.kind === 'file' && i.type.startsWith('image/'));
+      if (!item) return;
+      e.preventDefault();
+      subirArchivo(item.getAsFile());
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  });
+
+  const handleImageUpload = (e) => subirArchivo(e.target.files[0]);
+
+  const subirArchivo = async (file) => {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) { alert('La imagen debe pesar menos de 10MB'); return; }
 
@@ -84,6 +98,7 @@ export default function ProductForm({ producto, categorias, onClose, onSuccess }
           const base64 = reader.result;
           const response = await subirImagen(base64);
           setFormData(prev => ({ ...prev, imagen: response.url, imagenOptimizada: response.optimizedUrl }));
+          setBuscandoImagen(false);
         } catch (error) {
           alert('Error al subir imagen');
         } finally {
@@ -168,7 +183,12 @@ export default function ProductForm({ producto, categorias, onClose, onSuccess }
                     className="w-full flex items-center gap-2 px-4 py-2 rounded text-sm font-medium bg-purple-50 text-purple-700 hover:bg-purple-100 disabled:opacity-50">
                     <Search className="w-4 h-4" /> Buscar imagen
                   </button>
-                  <p className="text-xs text-gray-500">JPG, PNG o WebP. Max 10MB.</p>
+                  <button type="button" disabled={uploading}
+                    onClick={() => abrirGoogleImagenes([formData.marca, formData.nombre].filter(Boolean).join(' '))}
+                    className="w-full flex items-center gap-2 px-4 py-2 rounded text-sm font-medium bg-gray-50 text-gray-700 hover:bg-gray-100 disabled:opacity-50">
+                    <ExternalLink className="w-4 h-4" /> Buscar en Google
+                  </button>
+                  <p className="text-xs text-gray-500">JPG, PNG o WebP. Max 10MB. También podés copiar una imagen y pegarla acá con Ctrl+V.</p>
                   {imagenPreview && (
                     <button type="button" onClick={() => setFormData(prev => ({ ...prev, imagen: '', imagenOptimizada: '' }))}
                       className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700">
@@ -281,6 +301,12 @@ export default function ProductForm({ producto, categorias, onClose, onSuccess }
   );
 }
 
+// Abre Google Imágenes en una pestaña nueva con la búsqueda lista
+function abrirGoogleImagenes(consulta) {
+  const q = String(consulta || '').trim();
+  window.open(`https://www.google.com.ar/search?tbm=isch&q=${encodeURIComponent(q)}`, '_blank', 'noopener');
+}
+
 // =================== IMPORTAR PRESUPUESTO PDF ===================
 
 function BuscarImagenModal({ consultaInicial, onClose, onElegida }) {
@@ -288,6 +314,19 @@ function BuscarImagenModal({ consultaInicial, onClose, onElegida }) {
   const [buscando, setBuscando] = useState(false);
   const [importando, setImportando] = useState(null);
   const [resultados, setResultados] = useState(null);
+  const [enlace, setEnlace] = useState('');
+
+  const abrirGoogle = () => abrirGoogleImagenes(consulta);
+
+  const usarEnlace = async (e) => {
+    e?.preventDefault();
+    const url = enlace.trim();
+    if (!/^https:\/\//i.test(url)) {
+      alert('Pegá el enlace de la imagen (tiene que empezar con https://)');
+      return;
+    }
+    await elegir({ url });
+  };
 
   const buscar = async (e) => {
     e?.preventDefault();
@@ -327,6 +366,18 @@ function BuscarImagenModal({ consultaInicial, onClose, onElegida }) {
           <button type="submit" disabled={buscando} className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2">
             {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             Buscar
+          </button>
+          <button type="button" onClick={abrirGoogle} className="bg-white border text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-50 flex items-center gap-2">
+            <ExternalLink className="w-4 h-4" /> Buscar en Google
+          </button>
+        </form>
+        <form onSubmit={usarEnlace} className="flex gap-2 p-4 border-b bg-gray-50">
+          <input type="text" value={enlace} onChange={(e) => setEnlace(e.target.value)}
+            className="flex-1 border rounded px-3 py-2 text-sm"
+            placeholder="O pegá acá el enlace de la imagen (clic derecho → Copiar dirección de la imagen)" />
+          <button type="submit" disabled={!!importando || !enlace.trim()} className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2">
+            {importando === enlace.trim() && <Loader2 className="w-4 h-4 animate-spin" />}
+            Usar esta imagen
           </button>
         </form>
         <div className="p-4 overflow-y-auto">
