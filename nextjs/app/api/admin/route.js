@@ -406,6 +406,28 @@ export async function POST(request) {
       });
     }
 
+    // UPLOAD BANNER DEL CARRUSEL DE INICIO (ancho hasta 1920 px, sin achicar a 800 como los productos)
+    if (action === 'upload-banner') {
+      const { image } = await request.json();
+      if (!image || typeof image !== 'string' || !image.startsWith('data:image/')) {
+        return NextResponse.json({ error: 'Imagen requerida' }, { status: 400 });
+      }
+      try {
+        const result = await cloudinary.uploader.upload(image, {
+          folder: 'alumiweb-banners',
+          resource_type: 'image',
+          transformation: [
+            { width: 1920, height: 1080, crop: 'limit' },
+            { quality: 'auto', fetch_format: 'auto' }
+          ]
+        });
+        return NextResponse.json({ success: true, url: result.secure_url, publicId: result.public_id });
+      } catch (e) {
+        console.error('Error subiendo banner:', e.message);
+        return NextResponse.json({ error: 'No se pudo subir la imagen' }, { status: 502 });
+      }
+    }
+
     // CREATE PRODUCT
     await connectDB();
     const { nombre, descripcion, precio, categoria, marca, medidas, imagen, imagenOptimizada, mostrar, stock } = await request.json();

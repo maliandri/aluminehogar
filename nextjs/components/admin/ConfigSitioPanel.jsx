@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { obtenerSiteConfigAdmin, guardarSiteConfig } from '@/services/api';
+import SlidesEditor from './SlidesEditor';
 
 // Grupos y campos del formulario (los mismos que valida el servidor)
 const GRUPOS = [
@@ -110,6 +111,14 @@ export default function ConfigSitioPanel() {
           ))}
         </section>
       ))}
+
+      <section className="bg-white shadow rounded-lg p-6 space-y-4">
+        <h3 className="text-lg font-semibold">Carrusel de promociones (inicio)</h3>
+        <SlidesEditor
+          slides={config.inicio.slides || []}
+          onChange={(slides) => cambiar('inicio', 'slides', slides)}
+        />
+      </section>
 
       {mensaje && (
         <div role={mensaje.tipo === 'ok' ? 'status' : 'alert'} className={`rounded-lg p-4 text-sm border ${mensaje.tipo === 'ok' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>

@@ -18,6 +18,7 @@ export const SITE_DEFAULTS = {
   inicio: {
     titulo: 'Alumine con el calor del HOGAR!',
     subtitulo: 'Encuentra los mejores productos para tu descanso',
+    slides: [],
   },
   chatbot: {
     envio: 'Envio GRATIS en Neuquen Capital',

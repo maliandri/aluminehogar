@@ -178,6 +178,11 @@ export const eliminarProducto = async (id) => {
   }
 };
 
+export const subirBanner = async (imageBase64) => {
+  const response = await api.post('/admin?action=upload-banner', { image: imageBase64 });
+  return response.data;
+};
+
 export const subirImagen = async (imageBase64) => {
   try {
     const response = await api.post('/admin?action=upload', { image: imageBase64 });

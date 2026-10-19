@@ -6,6 +6,7 @@ import { ProductGridView } from '@/components/ProductGridView';
 import { ProductListView } from '@/components/ProductListView';
 import { ProductCarouselView } from '@/components/ProductCarouselView';
 import { VendedorModal } from '@/components/VendedorModal';
+import HeroCarousel from '@/components/HeroCarousel';
 import { CategorySidebar } from '@/components/CategorySidebar';
 import { useUI } from '@/components/ClientProviders';
 import { useSite } from '@/components/SiteProvider';
@@ -13,6 +14,7 @@ import { telHref } from '@/lib/site-format';
 
 export default function HomePageClient({ initialProductos, initialCategorias }) {
   const site = useSite();
+  const slidesActivos = (site.inicio.slides || []).filter((s) => s.activo);
   const [productos] = useState(initialProductos || []);
   const [categorias] = useState(initialCategorias || []);
   const { showVendedorModal, setShowVendedorModal, showAuthModal, setShowAuthModal } = useUI();
@@ -62,24 +64,28 @@ export default function HomePageClient({ initialProductos, initialCategorias }) 
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <section
-        id="inicio"
-        className="relative h-[500px] flex items-center justify-center text-center gradient-primary text-white"
-      >
-        <div className="gradient-overlay absolute inset-0" />
-        <div className="relative z-10 container-custom px-4">
-          <h1 className="text-4xl md:text-6xl font-bold mb-4 text-shadow animate-fadeIn">
-            {site.inicio.titulo}
-          </h1>
-          <p className="text-xl md:text-2xl mb-8 text-shadow animate-fadeIn">
-            {site.inicio.subtitulo}
-          </p>
-          <a href="#productos" className="btn-primary inline-block text-lg animate-fadeIn">
-            Ver Productos
-          </a>
-        </div>
-      </section>
+      {/* Hero: carrusel de promociones; sin promociones activas, el hero de siempre */}
+      {slidesActivos.length > 0 ? (
+        <HeroCarousel slides={slidesActivos} tituloSeo={site.inicio.titulo} />
+      ) : (
+        <section
+          id="inicio"
+          className="relative h-[500px] flex items-center justify-center text-center gradient-primary text-white"
+        >
+          <div className="gradient-overlay absolute inset-0" />
+          <div className="relative z-10 container-custom px-4">
+            <h1 className="text-4xl md:text-6xl font-bold mb-4 text-shadow animate-fadeIn">
+              {site.inicio.titulo}
+            </h1>
+            <p className="text-xl md:text-2xl mb-8 text-shadow animate-fadeIn">
+              {site.inicio.subtitulo}
+            </p>
+            <a href="#productos" className="btn-primary inline-block text-lg animate-fadeIn">
+              Ver Productos
+            </a>
+          </div>
+        </section>
+      )}
 
       {/* Productos Section */}
       <section id="productos" className="py-16">
